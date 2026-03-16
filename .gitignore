@@ -1,0 +1,5 @@
+venv/
+!data/input/.gitkeep
+!data/output/.gitkeep
+data/
+__pycache__/
