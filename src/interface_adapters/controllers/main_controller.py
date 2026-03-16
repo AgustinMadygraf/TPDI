@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from src.entities.image import Image
-from src.infrastructure.opencv.image_loader import OpenCVImageLoader
+from src.infrastructure.opencv import CV2ImageAdapter
 from src.interface_adapters.presenters.image_presenter import ImagePresenter
 from src.use_cases.load_images import LoadImagesFromDirectory
 
@@ -14,7 +14,7 @@ class MainController:
     DEFAULT_INPUT_DIR = Path("data/input")
     
     def __init__(self):
-        self._loader = OpenCVImageLoader()
+        self._loader = CV2ImageAdapter()
         self._use_case = LoadImagesFromDirectory(self._loader)
         self._presenter = ImagePresenter()
         self._images: List[Image] = []
