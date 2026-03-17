@@ -4,36 +4,50 @@ Path: src/interface_adapters/gateways/image_gateway.py
 
 from pathlib import Path
 from typing import Callable, Optional
+
 from src.use_cases.load_images import ImageLoaderPort, LoadImagesFromDirectory
 from src.entities.image import Image
 
+
 class ImageGateway:
+    """Gateway para operaciones de carga de imágenes."""
+
     def __init__(
         self,
-        adapter: ImageLoaderPort,
+        loader: ImageLoaderPort,
         base_path: Optional[Path] = None,
         on_load_error: Optional[Callable[[Path, Exception], None]] = None
     ):
-        self._adapter = adapter
+        """Inicializa el gateway.
+
+        Args:
+            loader: Adaptador para cargar imágenes.
+            base_path: Directorio base para carga de imágenes.
+            on_load_error: Callback opcional para errores de carga.
+        """
+        self._loader = loader
         self._base_path = (base_path or Path("data/input")).resolve()
         self._on_load_error = on_load_error
 
-    def _validate_path(self, path: Path) -> Path:
-        "Valida que el path resuelto esté dentro del directorio base permitido."
-        resolved = (self._base_path / path).resolve()
-        try:
-            resolved.relative_to(self._base_path)
-        except ValueError as exc:
-            raise PermissionError(f"Path no permitido: {path}") from exc
-        return resolved
-
     def load(self, path: Path) -> Image:
-        validated_path = self._validate_path(path)
-        return self._adapter.load(validated_path)
+        """Carga una imagen desde el path especificado.
+
+        Args:
+            path: Ruta de la imagen.
+
+        Returns:
+            La imagen cargada.
+        """
+        return self._loader.load(path)
 
     def load_all(self) -> list[Image]:
-        use_case = LoadImagesFromDirectory(self._adapter, on_error=self._on_load_error)
-        return use_case.execute(self._base_path)
+        """Carga todas las imágenes del directorio base.
 
-    def display(self, image: Image) -> None:
-        self._adapter.display(image)
+        Returns:
+            Lista de imágenes cargadas.
+        """
+        use_case = LoadImagesFromDirectory(
+            self._loader,
+            on_error=self._on_load_error
+        )
+        return use_case.execute(self._base_path)

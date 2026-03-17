@@ -1,0 +1,53 @@
+"""
+Path: src/infrastructure/opencv/cv2_image_loader.py
+"""
+
+from pathlib import Path
+
+import cv2
+
+from src.infrastructure.numpy.image_adapter import NumPyImageAdapter
+from src.infrastructure.shared.path_validator import PathValidator
+from src.use_cases.load_images import ImageLoaderPort
+from src.entities.image import Image
+
+
+class CV2ImageLoader(ImageLoaderPort):
+    """Carga imágenes usando OpenCV."""
+
+    def __init__(self, path_validator: PathValidator):
+        """Inicializa el loader con un validador de paths.
+
+        Args:
+            path_validator: Validador para prevenir path traversal.
+        """
+        self._path_validator = path_validator
+        self._numpy_adapter = NumPyImageAdapter()
+
+    def load(self, path: Path) -> Image:
+        """Carga una imagen desde el path especificado.
+
+        Args:
+            path: Ruta de la imagen (relativa o absoluta).
+
+        Returns:
+            La imagen cargada.
+
+        Raises:
+            PermissionError: Si el path no está permitido.
+            ValueError: Si no se puede cargar la imagen.
+        """
+        validated_path = self._path_validator.validate(path)
+        data = cv2.imread(str(validated_path), cv2.IMREAD_UNCHANGED)
+
+        if data is None:
+            raise ValueError(f"No se pudo cargar la imagen: {validated_path}")
+
+        if len(data.shape) == 3 and data.shape[2] >= 3:
+            data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
+
+        return self._numpy_adapter.from_numpy(
+            name=validated_path.name,
+            data=data,
+            path=str(validated_path)
+        )

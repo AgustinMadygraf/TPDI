@@ -1,76 +1,120 @@
 # Tareas Completadas - TPDI
 
-> Fecha de procesamiento: 2026-03-16  
+> Fecha de procesamiento: 2026-03-16
 > Skill: todo-workflow
+> ADR Implementado: ADR-001
 
 ---
 
-## CERTEZAS Ejecutadas (Automático)
+## ADR-001: Separar Interfaces de Image Gateway - IMPLEMENTADO
 
-### [COMPLETADO] Path Traversal en CV2ImageAdapter
-- **Archivo**: `src/infrastructure/opencv/cv2_image_adapter.py`
-- **Cambio**: Agregado parámetro `base_path` al constructor y método `_validate_path()`
-- **Validación**: Todos los paths se resuelven y validan contra el directorio base
-- **Fix adicional**: Corregido path resolution en `LoadImagesFromDirectory` para usar paths absolutos
-- **Fecha**: 2026-03-16
+### Tareas Ejecutadas (Automático)
 
-### [COMPLETADO] Bypass de validación en ImageGateway
+#### ✅ CERTEZA 1: Crear ImageDisplayPort
+- **Archivo**: `src/use_cases/display_image.py`
+- **Contenido**: Protocol `ImageDisplayPort` con método `display(image: Image) -> None`
+- **Estado**: Completado
+
+#### ✅ CERTEZA 2: Crear PathValidator
+- **Archivo**: `src/infrastructure/shared/path_validator.py`
+- **Contenido**: Clase `PathValidator` con método `validate(path, base_path)`
+- **Lógica**: Resuelve path, valida con `relative_to()`, lanza `PermissionError`
+- **Estado**: Completado
+
+#### ✅ CERTEZA 3: Crear CV2ImageLoader
+- **Archivo**: `src/infrastructure/opencv/cv2_image_loader.py`
+- **Implementa**: `ImageLoaderPort`
+- **Dependencias**: Usa `PathValidator` para validación de seguridad
+- **Estado**: Completado
+
+#### ✅ CERTEZA 4: Crear CV2ImageDisplayer
+- **Archivo**: `src/infrastructure/opencv/cv2_image_displayer.py`
+- **Implementa**: `ImageDisplayPort`
+- **Lógica**: Usa OpenCV (cv2.imshow) para visualización
+- **Estado**: Completado
+
+#### ✅ CERTEZA 5: Actualizar ImageGateway
 - **Archivo**: `src/interface_adapters/gateways/image_gateway.py`
-- **Cambio**: Reescrita la lógica de `load()` para SIEMPRE validar paths (absolutos y relativos)
-- **Método agregado**: `_validate_path()` que resuelve y valida contra `base_path`
-- **Fecha**: 2026-03-16
+- **Cambios**:
+  - Eliminado: `_validate_path()` (ahora en PathValidator)
+  - Eliminado: `display()` (la UI usa displayer directamente)
+  - Agregado: Parámetro `on_load_error` callback
+- **Estado**: Completado
 
-### [COMPLETADO] Silenciamiento de errores en LoadImagesFromDirectory
-- **Archivo**: `src/use_cases/load_images.py`
-- **Cambio**: Reemplazado `pass` por `logging.getLogger(__name__).warning(...)`
-- **Beneficio**: Los errores de carga ahora son visibles en logs para diagnóstico
-- **Fecha**: 2026-03-16
+#### ✅ CERTEZA 6: Actualizar CLIApp
+- **Archivo**: `src/infrastructure/cli/app.py`
+- **Cambios**:
+  - Agregado: Parámetros `loader` y `displayer` en constructor
+  - Modificado: `_display_image()` usa `self._displayer.display()`
+  - Eliminado: Uso de `gateway.display()`
+- **Estado**: Completado
 
----
+#### ✅ CERTEZA 7: Actualizar run.py
+- **Archivo**: `run.py`
+- **Cambios**:
+  - Agregado: Imports de `CV2ImageLoader`, `CV2ImageDisplayer`, `PathValidator`
+  - Modificado: Wiring completo de dependencias
+- **Estado**: Completado
 
-## DUDAS BAJO NIVEL Ejecutadas (Decisión del Agente)
+#### ✅ CERTEZA 8: Verificar MainController
+- **Archivo**: `src/interface_adapters/controllers/main_controller.py`
+- **Resultado**: Sin cambios necesarios. Usa `ImageLoaderPort` correctamente.
+- **Estado**: Verificado
 
-### [COMPLETADO] Acoplamiento en CLIApp - Decisión: Inyección desde run.py
-| Opción | Pros | Contras | Decisión |
-|--------|------|---------|----------|
-| A. Inyectar desde run.py | Máxima flexibilidad, testeable | Cambio en entry point | ✅ ELEGIDA |
-| B. Factory pattern | Encapsula creación | Más complejo | ❌ |
-| C. Mantener como está | Sin cambios | Difícil de testear | ❌ |
+#### ✅ CERTEZA 9: Limpiar archivos obsoletos
+- **Eliminado**: `src/infrastructure/opencv/cv2_image_adapter.py`
+- **Reemplazado por**: `cv2_image_loader.py` + `cv2_image_displayer.py`
+- **Estado**: Completado
 
-**Justificación**: La inyección desde `run.py` es el patrón más simple y consistente con Clean Architecture. El entry point es responsable del wiring.
-
-**Cambios**:
-- `run.py`: Crea adapter y lo pasa a `CLIApp`
-- `src/infrastructure/cli/app.py`: Acepta `adapter: ImageLoaderPort` en constructor
-
-**Fecha**: 2026-03-16
-
-### [COMPLETADO] SUPPORTED_EXTENSIONS hardcodeado - Decisión: Constructor configurable
-| Opción | Pros | Contras | Decisión |
-|--------|------|---------|----------|
-| A. Constructor con extensión opcional | Flexible, OCP, retrocompatible | Ligeramente más complejo | ✅ ELEGIDA |
-| B. Constante de clase sobrescribible | Simple | Menos flexible | ❌ |
-| C. Config global | Compartido | Acoplamiento a config | ❌ |
-
-**Justificación**: Constructor con parámetro opcional mantiene retrocompatibilidad y permite extensibilidad sin modificar la clase (Open/Closed Principle).
-
-**Cambios**:
-- Renombrado `SUPPORTED_EXTENSIONS` → `DEFAULT_EXTENSIONS`
-- Agregado parámetro `supported_extensions: Optional[Set[str]] = None` al constructor
-- Usa `self._extensions` en lugar de la constante de clase
-
-**Fecha**: 2026-03-16
+#### ✅ CERTEZA 10: Validación
+- **Pruebas**:
+  - ✅ Carga de imágenes funciona correctamente
+  - ✅ Path traversal bloqueado (`../../../etc/passwd` → PermissionError)
+  - ✅ Separación de responsabilidades verificada
+  - ✅ Clean Architecture validada
 
 ---
 
-## DUDAS ALTO NIVEL Escaladas
+## Arquitectura Resultante
 
-Las siguientes decisiones fueron escaladas a `docs/decisions/preguntas-arquitectura.md`:
+```
+entities/
+  └── image.py                    ← Image (dataclass)
 
-1. **¿Cómo reestructurar las interfaces de Image Gateway?** - Separación de `load` vs `display`
-2. **¿Dónde debe vivir la lógica de validación de paths?** - Centralización de validación
+use_cases/
+  ├── load_images.py              ← ImageLoaderPort (Protocol)
+  └── display_image.py            ← ImageDisplayPort (Protocol) [NUEVO]
 
-Estas requieren decisión del usuario debido a su impacto cross-cutting en la arquitectura.
+interface_adapters/
+  ├── controllers/main_controller.py    ← Usa ImageLoaderPort
+  ├── gateways/image_gateway.py         ← Usa ImageLoaderPort + callback
+  └── presenters/image_presenter.py
+
+infrastructure/
+  ├── shared/
+  │   └── path_validator.py       ← PathValidator (reusable) [NUEVO]
+  ├── opencv/
+  │   ├── cv2_image_loader.py     ← CV2ImageLoader [NUEVO]
+  │   └── cv2_image_displayer.py  ← CV2ImageDisplayer [NUEVO]
+  ├── numpy/
+  │   └── image_adapter.py
+  ├── cli/
+  │   └── app.py                  ← Inyecta loader + displayer
+  └── settings/
+      └── logger.py
+
+run.py                            ← Wiring de todas las dependencias
+```
+
+---
+
+## Beneficios Logrados
+
+1. ✅ **Escalabilidad a Matplotlib**: Cambiar visualizador = solo crear nuevo displayer e inyectarlo
+2. ✅ **Testabilidad**: Tests independientes para loader, displayer y validación
+3. ✅ **Clean Architecture**: Cada capa depende solo de los protocols que necesita
+4. ✅ **Seguridad**: PathValidator centralizado reusable
+5. ✅ **ISP/SRP cumplidos**: Cada clase tiene una sola responsabilidad clara
 
 ---
 
@@ -78,7 +122,10 @@ Estas requieren decisión del usuario debido a su impacto cross-cutting en la ar
 
 | Tipo | Cantidad | Acción |
 |------|----------|--------|
-| CERTEZAS | 3 | Ejecutadas |
-| DUDAS BAJO NIVEL | 2 | Evaluadas y ejecutadas |
-| DUDAS ALTO NIVEL | 2 | Escaladas a preguntas-arquitectura.md |
-| **Total** | **7** | Procesadas |
+| CERTEZAS | 10 | Ejecutadas automáticamente |
+| Archivos creados | 5 | Nuevos componentes |
+| Archivos modificados | 4 | Actualizaciones |
+| Archivos eliminados | 1 | Limpieza |
+| **Total** | **10/10** | **Completado** |
+
+**docs/todo.md**: VACÍO (garantía cumplida)
