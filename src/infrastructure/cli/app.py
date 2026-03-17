@@ -47,14 +47,14 @@ class CLIApp:
         return use_case.execute(self._base_path)
 
     def run_color_channel_analysis(self) -> bool:
-        """Ejecuta análisis de canales de color en grid 2x3.
+        """Ejecuta análisis de canales de color en grid 2x4.
         
         Returns:
             True si se ejecutó correctamente, False si no hay imágenes.
         """
-        print("=" * 50)
+        print("=" * 60)
         print("TPDI - Analisis de Canales de Color")
-        print("=" * 50)
+        print("=" * 60)
         print()
         
         # Cargar imágenes
@@ -77,20 +77,35 @@ class CLIApp:
         print(f"  Canales: {original.channels}")
         print()
         
-        # Procesar variantes
-        print("Procesando canales de color...")
+        # Procesar variantes (con depuración incluida)
         variants = self._process_color_variants(original)
-        print(f"  Original: {original.name}")
-        for name, img in variants:
-            print(f"  {name}: {img.name}")
-        print()
         
         # Mostrar grid 2x4
+        print()
         self._display_grid_2x4(original, variants)
         
         print()
+        print("=" * 60)
         print("Aplicacion finalizada.")
+        print("=" * 60)
         return True
+
+    def _analyze_pixel(self, image: Image, x: int, y: int) -> tuple:
+        """Obtiene el valor RGB de un pixel específico.
+        
+        Args:
+            image: Imagen a analizar.
+            x: Coordenada X.
+            y: Coordenada Y.
+            
+        Returns:
+            Tupla (R, G, B) o (G,) si es grayscale.
+        """
+        idx = (y * image.width + x) * image.channels
+        if image.channels == 3:
+            return (image.data[idx], image.data[idx+1], image.data[idx+2])
+        else:
+            return (image.data[idx],)
 
     def _process_color_variants(self, original: Image) -> List[Tuple[str, Image]]:
         """Procesa las variantes de canales de color RGB.
@@ -101,14 +116,99 @@ class CLIApp:
         Returns:
             Lista de tuplas (nombre_descriptivo, imagen_procesada).
         """
+        print()
+        print("=" * 60)
+        print("DEPURACION DE CANALES RGB")
+        print("=" * 60)
+        print(f"Imagen: {original.name}")
+        print(f"Dimensiones: {original.width}x{original.height}, Canales: {original.channels}")
+        print(f"Total de bytes en data: {len(original.data)}")
+        print(f"Total de pixeles: {len(original.data) // original.channels}")
+        print()
+        
+        # Muestreo de pixeles de la imagen original (esquinas y centro)
+        print("MUESTRA DE PIXELES DE LA IMAGEN ORIGINAL:")
+        print("-" * 60)
+        sample_positions = [
+            (0, 0, "Esquina superior izquierda"),
+            (original.width // 2, original.height // 2, "Centro"),
+            (original.width - 1, original.height - 1, "Esquina inferior derecha"),
+            (original.width // 4, original.height // 4, "Cuarto superior izquierdo"),
+            (3 * original.width // 4, 3 * original.height // 4, "Tres cuartos inferior derecho")
+        ]
+        
+        for x, y, desc in sample_positions:
+            r, g, b = self._analyze_pixel(original, x, y)
+            print(f"  ({x:4d},{y:4d}) {desc:30s} -> R={r:3d}, G={g:3d}, B={b:3d}")
+        
+        print()
+        print("ESTADISTICAS GLOBALES DE LA ORIGINAL:")
+        print("-" * 60)
+        
+        # Calcular estadísticas por canal
+        r_values = [original.data[i] for i in range(0, len(original.data), 3)]
+        g_values = [original.data[i+1] for i in range(0, len(original.data), 3)]
+        b_values = [original.data[i+2] for i in range(0, len(original.data), 3)]
+        
+        print(f"  Canal Rojo   -> Min: {min(r_values):3d}, Max: {max(r_values):3d}, Promedio: {sum(r_values)/len(r_values):6.2f}")
+        print(f"  Canal Verde  -> Min: {min(g_values):3d}, Max: {max(g_values):3d}, Promedio: {sum(g_values)/len(g_values):6.2f}")
+        print(f"  Canal Azul   -> Min: {min(b_values):3d}, Max: {max(b_values):3d}, Promedio: {sum(b_values)/len(b_values):6.2f}")
+        print()
+        
+        # Extraer canales directamente de la imagen ORIGINAL
+        print("EXTRAYENDO CANALES DE LA IMAGEN ORIGINAL...")
+        print("-" * 60)
+        red_channel = extract_red_channel(original)
+        green_channel = extract_green_channel(original)
+        blue_channel = extract_blue_channel(original)
+        full_grayscale = apply_grayscale(original)
+        red_grayscale = red_to_grayscale(original)
+        green_grayscale = green_to_grayscale(original)
+        blue_grayscale = blue_to_grayscale(original)
+        
+        # Verificar que los canales se extrajeron correctamente
+        print("VERIFICACION DE EXTRACCION:")
+        print("-" * 60)
+        
+        # Verificar canal rojo (debe tener R original, G=0, B=0)
+        r_red = red_channel.data[0]
+        g_red = red_channel.data[1]
+        b_red = red_channel.data[2]
+        r_orig = original.data[0]
+        print(f"  Canal Rojo: Pixel 0 -> R={r_red:3d}, G={g_red:3d}, B={b_red:3d} | R original era: {r_orig:3d} | OK: {r_red == r_orig and g_red == 0 and b_red == 0}")
+        
+        # Verificar canal verde (debe tener R=0, G original, B=0)
+        r_green = green_channel.data[0]
+        g_green = green_channel.data[1]
+        b_green = green_channel.data[2]
+        g_orig = original.data[1]
+        print(f"  Canal Verde: Pixel 0 -> R={r_green:3d}, G={g_green:3d}, B={b_green:3d} | G original era: {g_orig:3d} | OK: {r_green == 0 and g_green == g_orig and b_green == 0}")
+        
+        # Verificar canal azul (debe tener R=0, G=0, B original)
+        r_blue = blue_channel.data[0]
+        g_blue = blue_channel.data[1]
+        b_blue = blue_channel.data[2]
+        b_orig = original.data[2]
+        print(f"  Canal Azul: Pixel 0 -> R={r_blue:3d}, G={g_blue:3d}, B={b_blue:3d} | B original era: {b_orig:3d} | OK: {r_blue == 0 and g_blue == 0 and b_blue == b_orig}")
+        
+        # Verificar escala de grises
+        r_gray = full_grayscale.data[0]
+        g_gray = full_grayscale.data[1]
+        b_gray = full_grayscale.data[2]
+        expected_gray = int((r_orig + g_orig + b_orig) / 3)
+        print(f"  Escala Gris: Pixel 0 -> R={r_gray:3d}, G={g_gray:3d}, B={b_gray:3d} | Esperado: {expected_gray:3d} | OK: {r_gray == expected_gray and g_gray == expected_gray and b_gray == expected_gray}")
+        
+        print()
+        print("=" * 60)
+        
         return [
-            ("Canal Rojo (R,0,0)", extract_red_channel(original)),
-            ("Canal Verde (0,G,0)", extract_green_channel(original)),
-            ("Canal Azul (0,0,B)", extract_blue_channel(original)),
-            ("Escala de grises", apply_grayscale(original)),
-            ("Rojo -> Gris", red_to_grayscale(original)),
-            ("Verde -> Gris", green_to_grayscale(original)),
-            ("Azul -> Gris", blue_to_grayscale(original))
+            ("Canal Rojo (R,0,0)", red_channel),
+            ("Canal Verde (0,G,0)", green_channel),
+            ("Canal Azul (0,0,B)", blue_channel),
+            ("Escala de grises", full_grayscale),
+            ("Rojo -> Gris", red_grayscale),
+            ("Verde -> Gris", green_grayscale),
+            ("Azul -> Gris", blue_grayscale)
         ]
 
     def _display_grid_2x4(self, original: Image, variants: List[Tuple[str, Image]]) -> None:

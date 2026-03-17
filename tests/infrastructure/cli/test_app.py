@@ -129,14 +129,27 @@ class TestCLIAppColorChannelAnalysis:
             mock_load.return_value = [sample_image]
             
             with patch.object(app, '_process_color_variants') as mock_process:
+                mock_red = Mock()
+                mock_red.data = [255, 0, 0] * 10000
+                mock_red.channels = 3
+                mock_green = Mock()
+                mock_green.data = [0, 255, 0] * 10000
+                mock_green.channels = 3
+                mock_blue = Mock()
+                mock_blue.data = [0, 0, 255] * 10000
+                mock_blue.channels = 3
+                mock_gray = Mock()
+                mock_gray.data = [128] * 30000
+                mock_gray.channels = 3
+                
                 mock_process.return_value = [
-                    ("Canal Rojo", Mock()),
-                    ("Canal Verde", Mock()),
-                    ("Canal Azul", Mock()),
-                    ("Gris", Mock()),
-                    ("R->Gris", Mock()),
-                    ("V->Gris", Mock()),
-                    ("A->Gris", Mock())
+                    ("Canal Rojo (R,0,0)", mock_red),
+                    ("Canal Verde (0,G,0)", mock_green),
+                    ("Canal Azul (0,0,B)", mock_blue),
+                    ("Escala de grises", mock_gray),
+                    ("Rojo -> Gris", mock_red),
+                    ("Verde -> Gris", mock_green),
+                    ("Azul -> Gris", mock_blue)
                 ]
                 
                 with patch.object(app, '_display_grid_2x4') as mock_display:
