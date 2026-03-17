@@ -2,26 +2,34 @@
 Path: src/infrastructure/cli/app.py
 """
 
-from src.entities.image import Image
-from src.infrastructure.opencv import CV2ImageAdapter
+from pathlib import Path
 from src.infrastructure.settings.logger import setup_logging, get_logger
 from src.interface_adapters.controllers.main_controller import MainController
 from src.interface_adapters.gateways.image_gateway import ImageGateway
-
+from src.use_cases.load_images import ImageLoaderPort
+from src.entities.image import Image
 
 class CLIApp:
     "Aplicación de línea de comandos para TPDI."
-    def __init__(self):
-        # Configurar logging una vez al inicio
+    def __init__(self, adapter: ImageLoaderPort):
         setup_logging(name="tpdi")
         self._logger = get_logger(__name__)
-        # Crear adapter (infrastructure) e inyectarlo al gateway (interface_adapters)
-        adapter = CV2ImageAdapter()
-        self._gateway = ImageGateway(adapter=adapter, base_path=MainController.DEFAULT_INPUT_DIR)
-        self._controller = MainController(image_loader=self._gateway)
+        self._gateway = ImageGateway(
+            adapter=adapter,
+            base_path=MainController.DEFAULT_INPUT_DIR,
+            on_load_error=self._on_load_error
+        )
+        self._controller = MainController(
+            image_loader=self._gateway,
+            on_load_error=self._on_load_error
+        )
+
+    def _on_load_error(self, path: Path, exc: Exception) -> None:
+        """Callback para manejar errores de carga de imágenes."""
+        self._logger.warning("No se pudo cargar imagen %s: %s", path, exc)
 
     def run(self) -> None:
-        """Ejecuta la aplicación CLI."""
+        "Ejecuta la aplicación CLI."
         self._logger.info("=" * 50)
         self._logger.info("TPDI - Procesamiento Digital de Imágenes")
         self._logger.info("=" * 50)
@@ -51,6 +59,6 @@ class CLIApp:
         self._logger.info("Visor cerrado. Aplicación finalizada.")
 
     def _display_image(self, image: Image) -> None:
-        """Muestra una imagen usando el adaptador."""
+        "Muestra una imagen usando el adaptador."
         self._logger.info("Mostrando imagen: %s", image.name)
         self._gateway.display(image)

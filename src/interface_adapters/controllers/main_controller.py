@@ -12,10 +12,17 @@ class MainController:
     "Controlador principal que coordina la carga inicial de imágenes."
     DEFAULT_INPUT_DIR = Path("data/input")
 
-    def __init__(self, image_loader: ImageLoaderPort):
+    def __init__(
+        self,
+        image_loader: ImageLoaderPort,
+        on_load_error: Optional[Callable[[Path, Exception], None]] = None
+    ):
         "Inicializa el controlador con el puerto de carga de imágenes."
         self._loader = image_loader
-        self._use_case = LoadImagesFromDirectory(self._loader)
+        self._use_case = LoadImagesFromDirectory(
+            self._loader,
+            on_error=on_load_error
+        )
         self._presenter = ImagePresenter()
         self._images: List[Image] = []
         self._on_images_loaded: Optional[Callable[[List[Image]], None]] = None
