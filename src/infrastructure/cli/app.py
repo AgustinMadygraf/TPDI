@@ -3,21 +3,18 @@ Path: src/infrastructure/cli/app.py
 """
 
 from pathlib import Path
-from typing import List, Tuple
-from src.infrastructure.shared.logger import setup_logging, get_logger
-from src.interface_adapters.controllers.main_controller import MainController
-from src.use_cases.load_images import ImageLoaderPort, LoadImagesFromDirectory
-from src.use_cases.display_image import ImageDisplayPort
-from src.use_cases.image_processing import (
-    apply_grayscale,
-    extract_red_channel,
-    extract_green_channel,
-    extract_blue_channel,
-    red_to_grayscale,
-    green_to_grayscale,
-    blue_to_grayscale,
-)
+from typing import List
+
 from src.entities.image import Image
+from src.infrastructure.shared.logger import setup_logging, get_logger
+from src.use_cases.color_analysis import (
+    ColorAnalysisResult,
+    ColorChannelAnalyzer,
+    ColorMode,
+)
+from src.interface_adapters.controllers.main_controller import MainController
+from src.use_cases.display_image import ImageDisplayPort
+from src.use_cases.load_images import ImageLoaderPort, LoadImagesFromDirectory
 
 
 class CLIApp:
@@ -28,12 +25,15 @@ class CLIApp:
         loader: ImageLoaderPort,
         displayer: ImageDisplayPort,
         base_path: Path = None,
+        color_mode: ColorMode = "RGB",
     ):
         setup_logging(name="tpdi")
         self._logger = get_logger(__name__)
         self._displayer = displayer
         self._loader = loader
         self._base_path = base_path or MainController.DEFAULT_INPUT_DIR
+        self._color_mode = color_mode
+        self._color_analyzer = ColorChannelAnalyzer()
 
     def _on_load_error(self, path: Path, exc: Exception) -> None:
         "Callback para manejar errores de carga de imágenes."
@@ -72,11 +72,11 @@ class CLIApp:
         print()
 
         # Procesar variantes (con depuración incluida)
-        variants = self._process_color_variants(original)
+        analysis = self._process_color_variants(original)
 
         # Mostrar grid 2x4
         print()
-        self._display_grid_2x4(original, variants)
+        self._display_grid_2x4(original, analysis)
 
         print()
         print("=" * 60)
@@ -85,18 +85,20 @@ class CLIApp:
         return True
 
     def _analyze_pixel(self, image: Image, x: int, y: int) -> tuple:
-        "Analiza el valor RGB de un pixel específico en la imagen."
+        "Analiza el valor del pixel específico en la imagen."
         idx = (y * image.width + x) * image.channels
         if image.channels == 3:
             return (image.data[idx], image.data[idx + 1], image.data[idx + 2])
         else:
             return (image.data[idx],)
 
-    def _process_color_variants(self, original: Image) -> List[Tuple[str, Image]]:
-        "Procesa la imagen original para extraer canales y aplicar escala de grises, con depuración."
+    def _process_color_variants(self, original: Image) -> ColorAnalysisResult:
+        "Construye el analisis configurable y muestra depuracion en consola."
+        analysis = self._color_analyzer.execute(original, self._color_mode)
+
         print()
         print("=" * 60)
-        print("DEPURACION DE CANALES RGB")
+        print(analysis.debug_title)
         print("=" * 60)
         print(f"Imagen: {original.name}")
         print(
@@ -122,135 +124,135 @@ class CLIApp:
         ]
 
         for x, y, desc in sample_positions:
-            r, g, b = self._analyze_pixel(original, x, y)
-            print(f"  ({x:4d},{y:4d}) {desc:30s} -> R={r:3d}, G={g:3d}, B={b:3d}")
+            values = self._analyze_pixel(original, x, y)
+            converted_values = self._convert_pixel_for_mode(values)
+            labels = analysis.channel_pixel_labels
+            print(
+                f"  ({x:4d},{y:4d}) {desc:30s} -> "
+                f"{labels[0]}={converted_values[0]:3d}, "
+                f"{labels[1]}={converted_values[1]:3d}, "
+                f"{labels[2]}={converted_values[2]:3d}"
+            )
 
         print()
         print("ESTADISTICAS GLOBALES DE LA ORIGINAL:")
         print("-" * 60)
 
-        # Calcular estadísticas por canal
-        r_values = [original.data[i] for i in range(0, len(original.data), 3)]
-        g_values = [original.data[i + 1] for i in range(0, len(original.data), 3)]
-        b_values = [original.data[i + 2] for i in range(0, len(original.data), 3)]
+        channel_values = self._extract_channel_values_for_mode(original)
+        channel_labels = analysis.channel_labels
 
         print(
-            f"  Canal Rojo   -> Min: {min(r_values):3d}, Max: {max(r_values):3d}, Promedio: {sum(r_values)/len(r_values):6.2f}"
+            f"  {channel_labels[0]:15s} -> Min: {min(channel_values[0]):3d}, Max: {max(channel_values[0]):3d}, Promedio: {sum(channel_values[0])/len(channel_values[0]):6.2f}"
         )
         print(
-            f"  Canal Verde  -> Min: {min(g_values):3d}, Max: {max(g_values):3d}, Promedio: {sum(g_values)/len(g_values):6.2f}"
+            f"  {channel_labels[1]:15s} -> Min: {min(channel_values[1]):3d}, Max: {max(channel_values[1]):3d}, Promedio: {sum(channel_values[1])/len(channel_values[1]):6.2f}"
         )
         print(
-            f"  Canal Azul   -> Min: {min(b_values):3d}, Max: {max(b_values):3d}, Promedio: {sum(b_values)/len(b_values):6.2f}"
+            f"  {channel_labels[2]:15s} -> Min: {min(channel_values[2]):3d}, Max: {max(channel_values[2]):3d}, Promedio: {sum(channel_values[2])/len(channel_values[2]):6.2f}"
         )
         print()
 
-        # Extraer canales directamente de la imagen ORIGINAL
         print("EXTRAYENDO CANALES DE LA IMAGEN ORIGINAL...")
         print("-" * 60)
-        red_channel = extract_red_channel(original)
-        green_channel = extract_green_channel(original)
-        blue_channel = extract_blue_channel(original)
-        full_grayscale = apply_grayscale(original)
-        red_grayscale = red_to_grayscale(original)
-        green_grayscale = green_to_grayscale(original)
-        blue_grayscale = blue_to_grayscale(original)
 
-        # Verificar que los canales se extrajeron correctamente
         print("VERIFICACION DE EXTRACCION:")
         print("-" * 60)
 
-        # Verificar canal rojo (debe tener R original, G=0, B=0)
-        r_red = red_channel.data[0]
-        g_red = red_channel.data[1]
-        b_red = red_channel.data[2]
-        r_orig = original.data[0]
-        print(
-            f"  Canal Rojo: Pixel 0 -> R={r_red:3d}, G={g_red:3d}, B={b_red:3d} | R original era: {r_orig:3d} | OK: {r_red == r_orig and g_red == 0 and b_red == 0}"
-        )
+        for variant in analysis.variants[:3]:
+            print(
+                self._build_channel_verification_message(
+                    original, variant.label, variant.image
+                )
+            )
 
-        # Verificar canal verde (debe tener R=0, G original, B=0)
-        r_green = green_channel.data[0]
-        g_green = green_channel.data[1]
-        b_green = green_channel.data[2]
-        g_orig = original.data[1]
+        grayscale_image = analysis.variants[3].image
+        original_values = self._convert_pixel_for_mode(tuple(original.data[:3]))
+        expected_gray = int(sum(original_values) / 3)
+        gray_values = tuple(grayscale_image.data[:3])
         print(
-            f"  Canal Verde: Pixel 0 -> R={r_green:3d}, G={g_green:3d}, B={b_green:3d} | G original era: {g_orig:3d} | OK: {r_green == 0 and g_green == g_orig and b_green == 0}"
-        )
-
-        # Verificar canal azul (debe tener R=0, G=0, B original)
-        r_blue = blue_channel.data[0]
-        g_blue = blue_channel.data[1]
-        b_blue = blue_channel.data[2]
-        b_orig = original.data[2]
-        print(
-            f"  Canal Azul: Pixel 0 -> R={r_blue:3d}, G={g_blue:3d}, B={b_blue:3d} | B original era: {b_orig:3d} | OK: {r_blue == 0 and g_blue == 0 and b_blue == b_orig}"
-        )
-
-        # Verificar escala de grises
-        r_gray = full_grayscale.data[0]
-        g_gray = full_grayscale.data[1]
-        b_gray = full_grayscale.data[2]
-        expected_gray = int((r_orig + g_orig + b_orig) / 3)
-        print(
-            f"  Escala Gris: Pixel 0 -> R={r_gray:3d}, G={g_gray:3d}, B={b_gray:3d} | Esperado: {expected_gray:3d} | OK: {r_gray == expected_gray and g_gray == expected_gray and b_gray == expected_gray}"
+            f"  Escala Gris: Pixel 0 -> "
+            f"R={gray_values[0]:3d}, G={gray_values[1]:3d}, B={gray_values[2]:3d} | "
+            f"Esperado: {expected_gray:3d} | OK: {gray_values == (expected_gray, expected_gray, expected_gray)}"
         )
 
         print()
         print("=" * 60)
 
-        return [
-            ("Canal Rojo (R,0,0)", red_channel),
-            ("Canal Verde (0,G,0)", green_channel),
-            ("Canal Azul (0,0,B)", blue_channel),
-            ("Escala de grises", full_grayscale),
-            ("Rojo -> Gris", red_grayscale),
-            ("Verde -> Gris", green_grayscale),
-            ("Azul -> Gris", blue_grayscale),
-        ]
+        return analysis
 
-    def _display_grid_2x4(
-        self, original: Image, variants: List[Tuple[str, Image]]
-    ) -> None:
-        """Muestra el grid 2x4 con la imagen original y variantes RGB.
+    def _display_grid_2x4(self, original: Image, analysis: ColorAnalysisResult) -> None:
+        """Muestra el grid 2x4 con la imagen original y variantes del modo activo.
 
         Args:
             original: Imagen original.
-            variants: Lista de variantes procesadas.
+            analysis: Resultado procesado para display.
         """
         print("Mostrando grid de analisis 2x4:")
-        print("  [FILA 1] ORIGINAL | ROJO (R,0,0) | VERDE (0,G,0) | AZUL (0,0,B)")
+        grid_labels = [variant.label for variant in analysis.variants]
         print(
-            "  [FILA 2] GRIS (promedio) | R->GRIS (R,R,R) | V->GRIS (G,G,G) | A->GRIS (B,B,B)"
+            f"  [FILA 1] ORIGINAL | {grid_labels[0]} | {grid_labels[1]} | {grid_labels[2]}"
+        )
+        print(
+            f"  [FILA 2] {grid_labels[3]} | {grid_labels[4]} | "
+            f"{grid_labels[5]} | {grid_labels[6]}"
         )
         print()
         print("Presiona cualquier tecla en la ventana para cerrar...")
         print()
 
-        # Grid 2x4: 2 filas, 4 columnas
-        red_channel = variants[0][1]
-        green_channel = variants[1][1]
-        blue_channel = variants[2][1]
-        full_grayscale = variants[3][1]
-        red_grayscale = variants[4][1]
-        green_grayscale = variants[5][1]
-        blue_grayscale = variants[6][1]
-
         grid_images = [
-            # Fila 1
             (original, "ORIGINAL"),
-            (red_channel, "CANAL ROJO"),
-            (green_channel, "CANAL VERDE"),
-            (blue_channel, "CANAL AZUL"),
-            # Fila 2
-            (full_grayscale, "ESCALA DE GRISES"),
-            (red_grayscale, "ROJO -> GRIS"),
-            (green_grayscale, "VERDE -> GRIS"),
-            (blue_grayscale, "AZUL -> GRIS"),
+            *[(variant.image, variant.label) for variant in analysis.variants],
         ]
 
         self._displayer.display_grid(
-            images=grid_images, grid_size=(2, 4), title=f"Analisis RGB: {original.name}"
+            images=grid_images, grid_size=(2, 4), title=analysis.analysis_title
+        )
+
+    def _convert_pixel_for_mode(
+        self, values: tuple[int, int, int]
+    ) -> tuple[int, int, int]:
+        """Convierte un pixel RGB al modo de color activo para depuracion."""
+        if self._color_mode == "CMY":
+            return tuple(255 - value for value in values)
+        return values
+
+    def _extract_channel_values_for_mode(
+        self, image: Image
+    ) -> tuple[List[int], List[int], List[int]]:
+        """Retorna los valores por canal segun el modo de color activo."""
+        first_channel = [image.data[i] for i in range(0, len(image.data), 3)]
+        second_channel = [image.data[i + 1] for i in range(0, len(image.data), 3)]
+        third_channel = [image.data[i + 2] for i in range(0, len(image.data), 3)]
+
+        if self._color_mode == "CMY":
+            return (
+                [255 - value for value in first_channel],
+                [255 - value for value in second_channel],
+                [255 - value for value in third_channel],
+            )
+
+        return (first_channel, second_channel, third_channel)
+
+    def _build_channel_verification_message(
+        self, original: Image, label: str, variant: Image
+    ) -> str:
+        """Construye un mensaje de verificacion para el primer pixel de una variante."""
+        source_values = self._convert_pixel_for_mode(tuple(original.data[:3]))
+        variant_values = tuple(variant.data[:3])
+
+        expected_by_label = {
+            "CANAL ROJO": (source_values[0], 0, 0),
+            "CANAL VERDE": (0, source_values[1], 0),
+            "CANAL AZUL": (0, 0, source_values[2]),
+            "CANAL CIAN": (0, source_values[0], source_values[0]),
+            "CANAL MAGENTA": (source_values[1], 0, source_values[1]),
+            "CANAL AMARILLO": (source_values[2], source_values[2], 0),
+        }
+        expected = expected_by_label[label]
+        return (
+            f"  {label}: Pixel 0 -> R={variant_values[0]:3d}, G={variant_values[1]:3d}, "
+            f"B={variant_values[2]:3d} | Esperado: {expected} | OK: {variant_values == expected}"
         )
 
     def run(self) -> None:

@@ -10,7 +10,11 @@ class ImageDisplayPort(Protocol):
     "Puerto para mostrar imágenes en pantalla."
 
     def display(
-        self, image: Image, comparison: Optional[Image] = None, layout: str = "vertical"
+        self,
+        image: Image,
+        comparison: Optional[Image] = None,
+        layout: str = "vertical",
+        comparison_labels: Optional[Tuple[str, str]] = None,
     ) -> None:
         """Muestra la imagen en pantalla.
 
@@ -18,6 +22,7 @@ class ImageDisplayPort(Protocol):
             image: Imagen principal a mostrar.
             comparison: Imagen opcional para comparación lado a lado.
             layout: "vertical" (una sobre otra) o "horizontal" (lado a lado).
+            comparison_labels: Etiquetas opcionales (principal, comparación).
         """
         raise NotImplementedError
 

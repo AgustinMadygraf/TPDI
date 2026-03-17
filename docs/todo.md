@@ -1,99 +1,85 @@
-# Auditoría de Código - TPDI
+# Backlog Técnico - TPDI
 
 > Fecha: 2026-03-17
-> Enfoque: SOLID y Clean Architecture para preparar migración a GUI Matplotlib
+> Enfoque actual: preparar soporte configurable RGB y CMY sin romper Clean Architecture
 
 ---
 
-## ✅ COMPLETADO - Configuración y Factory
+## Contexto Actual
 
-### ✅ Configuración centralizada implementada
+### Estado verificado
 
-**Archivo**: `src/infrastructure/shared/config.py`
-- [x] `AppConfig` con `GUI_BACKEND: Literal["cv2", "matplotlib"]`
-- [x] Valor por defecto: `"cv2"`
-- [x] `load_config()` para crear configuraciones personalizadas
+- [x] Configuración centralizada para backend de display en `src/infrastructure/shared/config.py`
+- [x] `DisplayerFactory` desacopla creación de displayers en `src/infrastructure/shared/displayer_factory.py`
+- [x] `CV2ImageLoader` normaliza BGR -> RGB al cargar desde OpenCV
+- [x] Existen puertos claros para carga y display en `src/use_cases/`
+- [x] Hay cobertura de tests para loader, displayer, CLI y procesamiento RGB actual
 
-### ✅ Factory Pattern implementado
+### Hallazgos de auditoría relevantes para RGB -> CMY
 
-**Archivo**: `src/infrastructure/shared/displayer_factory.py`
-- [x] `DisplayerFactory.create(config)` instancia el displayer correcto
-- [x] Registro lazy de backends
-- [x] `available_backends()` para listar opciones
-
-### ✅ run.py actualizado
-
-**Archivo**: `run.py`
-- [x] Usa `load_config()` y `DisplayerFactory.create(config)`
-- [x] Mantiene compatibilidad hacia atrás (CV2 por defecto)
+- [x] El procesamiento de color estaba acoplado semánticamente a RGB en `src/use_cases/image_processing.py` (mitigado con `src/use_cases/color_analysis.py`)
+- [x] La CLI mezclaba orquestación, análisis de color y presentación textual en `src/infrastructure/cli/app.py` (parcialmente mitigado)
+- [ ] La entidad `Image` no expresa el modelo de color; solo conoce cantidad de canales
+- [x] El comportamiento con imágenes RGBA no está cerrado de forma determinista en tests y contrato de carga (cerrado con normalización BGRA->RGB)
+- [x] `CV2ImageDisplayer.display()` mantenía etiquetas fijas para un caso de uso puntual (cerrado con `comparison_labels`)
 
 ---
 
-## 🟢 CORRECTO - Arquitectura Limpia (Clean Architecture)
+## Objetivo Inmediato
 
-### ✅ Capas bien definidas y dependencias correctas
+Permitir configurar desde `src/infrastructure/shared/config.py` si el análisis y la visualización de canales se realizan en modo `RGB` o `CMY`, con valor por defecto `RGB`.
 
-| Capa | Estado | Observaciones |
-|------|--------|---------------|
-| **Entities** (`src/entities/`) | ✅ | `Image` es puro, sin dependencias externas. Solo usa `dataclass` y tipos Python nativos. |
-| **Use Cases** (`src/use_cases/`) | ✅ | Definen Puertos (Protocols) e implementan lógica de negocio. No dependen de infraestructura. |
-| **Interface Adapters** (`src/interface_adapters/`) | ✅ | Controllers, Gateways y Presenters conectan casos de uso con infraestructura. |
-| **Infrastructure** (`src/infrastructure/`) | ✅ | Implementa los Puertos definidos en use_cases. Depende de frameworks (OpenCV, NumPy). |
+Regla acordada:
 
-### ✅ Inversión de Dependencias (Dependency Inversion)
-
-- **`ImageDisplayPort`** (Protocol) definido en `use_cases/display_image.py`
-  - Implementado por: `CV2ImageDisplayer` en infrastructure
-  
-- **`ImageLoaderPort`** (Protocol) definido en `use_cases/load_images.py`
-  - Implementado por: `CV2ImageLoader` en infrastructure
-
-- **Inyección de dependencias** en toda la cadena:
-  - `CLIApp` recibe `loader: ImageLoaderPort` y `displayer: ImageDisplayPort`
-  - `MainController` recibe `image_loader: ImageLoaderPort`
-  - `ImageGateway` recibe `loader: ImageLoaderPort`
-  - `LoadImagesFromDirectory` recibe `image_loader: ImageLoaderPort`
-  - `CV2ImageLoader` recibe `path_validator: PathValidator`
+- Las imágenes se cargan desde archivo y se normalizan a RGB canónico.
+- Si el modo configurado es `CMY`, la aplicación convierte desde RGB a CMY para analizar y mostrar.
+- El soporte `CMYK` queda explícitamente fuera de este alcance.
 
 ---
 
-## 📋 Plan de Acción - Implementar Matplotlib
+## Plan de Acción
 
-### Fase 1: ✅ Completada
-- [x] Implementar `AppConfig` en `config.py` con `GUI_BACKEND`
-- [x] Crear `DisplayerFactory` para instanciar el displayer correcto
-- [x] Actualizar `run.py` para usar la configuración
+### Fase 1: Configuración del modo de color
 
-### Fase 2: Implementar Matplotlib Displayer
-- [ ] Crear `MatplotlibImageDisplayer` en `src/infrastructure/matplotlib/`
-- [ ] Implementar `ImageDisplayPort` (`display()` y `display_grid()`)
-- [ ] Registrar en `DisplayerFactory`
-- [ ] Agregar tests unitarios
+- [x] Agregar `COLOR_MODE: Literal["RGB", "CMY"] = "RGB"` en `src/infrastructure/shared/config.py`
+- [x] Extender `load_config()` para aceptar `color_mode`
+- [x] Propagar la configuración desde `run.py` hacia la aplicación CLI
 
-### Fase 3: Uso
-```python
-# Para usar Matplotlib:
-config = load_config(gui_backend="matplotlib")
-displayer = DisplayerFactory.create(config)
-```
+### Fase 2: Desacoplar análisis de color de la CLI
+
+- [x] Crear un caso de uso específico para análisis de color configurable por modo
+- [x] Mover fuera de `CLIApp` la lógica de variantes, nombres de canales y títulos del análisis
+- [x] Mantener `CLIApp` como orquestador y no como contenedor de reglas RGB/CMY
+
+### Fase 3: Soporte mínimo para CMY
+
+- [x] Implementar conversión RGB -> CMY dentro del caso de uso de análisis
+- [x] Generar variantes visibles para Cian, Magenta y Amarillo sin mover la conversión al loader de OpenCV
+- [x] Adaptar títulos, etiquetas y mensajes de depuración para que dependan del modo de color activo
+
+### Fase 4: Endurecer contratos y pruebas
+
+- [x] Agregar tests unitarios para el análisis en modo `CMY`
+- [x] Ajustar tests de CLI para ambos modos de color
+- [x] Definir y testear comportamiento esperado para imágenes RGBA cargadas por OpenCV (normalización determinista a RGB de 3 canales)
+- [x] Revisar si `CV2ImageDisplayer.display()` debe recibir etiquetas dinámicas para comparaciones futuras
 
 ---
 
-## 📊 Resumen de Estadísticas
+## No Hacer en Esta Iteración
 
-| Categoría | Correctos | Advertencias | Críticos |
-|-----------|-----------|--------------|----------|
-| Clean Architecture | ✅ 4 capas | - | - |
-| SOLID - SRP | 5 clases | 1 | - |
-| SOLID - OCP | ✅ Factory implementado | - | - |
-| SOLID - LSP | ✅ N/A | - | - |
-| SOLID - ISP | ✅ | 1 | - |
-| SOLID - DIP | ✅ 6 inyecciones + Factory | - | - |
-| Configuración | ✅ Completado | - | - |
+- [x] No introducir todavía soporte `CMYK`
+- [x] No agregar todavía `color_mode` a la entidad `Image`
+- [x] No mover la responsabilidad de decodificación de archivos fuera de `CV2ImageLoader`
+- [x] No rediseñar la arquitectura completa si el caso de uso configurable resuelve RGB/CMY con bajo acoplamiento
 
-**Veredicto**: ✅ **LISTO PARA MATPLOTLIB**
+---
 
-La arquitectura es SÓLIDA. El código ahora cumple con Open/Closed Principle - puedes agregar Matplotlib sin modificar código existente, solo:
-1. Crear la nueva clase `MatplotlibImageDisplayer`
-2. Registrarla en el factory
-3. Cambiar la configuración a `gui_backend="matplotlib"`
+## Criterios de Aceptación
+
+- [x] `AppConfig` permite elegir `RGB` o `CMY`, con default `RGB`
+- [x] El loader sigue entregando imágenes RGB canónicas
+- [x] La CLI no contiene lógica fija de nombres de canales RGB
+- [x] El análisis produce variantes correctas para `RGB` y para `CMY`
+- [x] La solución mantiene dependencias hacia adentro y no introduce OpenCV en entidades o use cases
+- [x] Los tests cubren el comportamiento configurable sin romper la suite existente

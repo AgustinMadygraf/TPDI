@@ -25,7 +25,10 @@ class CV2ImageLoader(ImageLoaderPort):
         if data is None:
             raise ValueError(f"No se pudo cargar la imagen: {validated_path}")
 
-        if len(data.shape) == 3 and data.shape[2] >= 3:
+        if len(data.shape) == 3 and data.shape[2] == 4:
+            # Normalizar BGRA a RGB para mantener contrato interno de 3 canales.
+            data = cv2.cvtColor(data, cv2.COLOR_BGRA2RGB)
+        elif len(data.shape) == 3 and data.shape[2] == 3:
             data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
 
         return self._numpy_adapter.from_numpy(

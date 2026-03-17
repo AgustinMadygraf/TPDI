@@ -10,6 +10,7 @@ import pytest
 
 from src.entities.image import Image
 from src.infrastructure.cli.app import CLIApp
+from src.use_cases.color_analysis import ColorAnalysisResult, ColorAnalysisVariant
 
 
 class TestCLIApp:
@@ -48,6 +49,22 @@ class TestCLIApp:
                 
                 assert app._displayer == mock_displayer
                 assert app._loader == mock_loader
+                assert app._color_mode == "RGB"
+
+    def test_initialization_accepts_color_mode(self, mock_loader, mock_displayer):
+        """Test CLIApp allows overriding the color mode."""
+        with patch('src.infrastructure.cli.app.setup_logging'):
+            with patch('src.infrastructure.cli.app.get_logger') as mock_get_logger:
+                mock_logger = MagicMock()
+                mock_get_logger.return_value = mock_logger
+
+                app = CLIApp(
+                    loader=mock_loader,
+                    displayer=mock_displayer,
+                    color_mode="CMY",
+                )
+
+                assert app._color_mode == "CMY"
 
     def test_on_load_error_logs_warning(self, app):
         """Test that load error logs warning."""
@@ -129,28 +146,22 @@ class TestCLIAppColorChannelAnalysis:
             mock_load.return_value = [sample_image]
             
             with patch.object(app, '_process_color_variants') as mock_process:
-                mock_red = Mock()
-                mock_red.data = [255, 0, 0] * 10000
-                mock_red.channels = 3
-                mock_green = Mock()
-                mock_green.data = [0, 255, 0] * 10000
-                mock_green.channels = 3
-                mock_blue = Mock()
-                mock_blue.data = [0, 0, 255] * 10000
-                mock_blue.channels = 3
-                mock_gray = Mock()
-                mock_gray.data = [128] * 30000
-                mock_gray.channels = 3
-                
-                mock_process.return_value = [
-                    ("Canal Rojo (R,0,0)", mock_red),
-                    ("Canal Verde (0,G,0)", mock_green),
-                    ("Canal Azul (0,0,B)", mock_blue),
-                    ("Escala de grises", mock_gray),
-                    ("Rojo -> Gris", mock_red),
-                    ("Verde -> Gris", mock_green),
-                    ("Azul -> Gris", mock_blue)
-                ]
+                mock_process.return_value = ColorAnalysisResult(
+                    mode="RGB",
+                    debug_title="DEPURACION DE CANALES RGB",
+                    channel_labels=("Canal Rojo", "Canal Verde", "Canal Azul"),
+                    channel_pixel_labels=("Rojo", "Verde", "Azul"),
+                    analysis_title="Analisis RGB: test.png",
+                    variants=[
+                        ColorAnalysisVariant("CANAL ROJO", Mock()),
+                        ColorAnalysisVariant("CANAL VERDE", Mock()),
+                        ColorAnalysisVariant("CANAL AZUL", Mock()),
+                        ColorAnalysisVariant("ESCALA DE GRISES", Mock()),
+                        ColorAnalysisVariant("ROJO -> GRIS", Mock()),
+                        ColorAnalysisVariant("VERDE -> GRIS", Mock()),
+                        ColorAnalysisVariant("AZUL -> GRIS", Mock()),
+                    ],
+                )
                 
                 with patch.object(app, '_display_grid_2x4') as mock_display:
                     result = app.run_color_channel_analysis()
@@ -161,37 +172,65 @@ class TestCLIAppColorChannelAnalysis:
 
     def test_process_color_variants(self, app, sample_image):
         """Test _process_color_variants creates correct variants."""
-        variants = app._process_color_variants(sample_image)
-        
-        assert len(variants) == 7
-        
-        # Check names
-        names = [name for name, _ in variants]
-        assert "Canal Rojo (R,0,0)" in names
-        assert "Canal Verde (0,G,0)" in names
-        assert "Canal Azul (0,0,B)" in names
-        assert "Escala de grises" in names
-        assert "Rojo -> Gris" in names
-        assert "Verde -> Gris" in names
-        assert "Azul -> Gris" in names
-        
-        # Check all are Image instances
-        for _, img in variants:
-            assert isinstance(img, Image)
+        analysis = app._process_color_variants(sample_image)
+
+        assert analysis.mode == "RGB"
+        assert len(analysis.variants) == 7
+
+        names = [variant.label for variant in analysis.variants]
+        assert "CANAL ROJO" in names
+        assert "CANAL VERDE" in names
+        assert "CANAL AZUL" in names
+        assert "ESCALA DE GRISES" in names
+        assert "ROJO -> GRIS" in names
+        assert "VERDE -> GRIS" in names
+        assert "AZUL -> GRIS" in names
+
+        for variant in analysis.variants:
+            assert isinstance(variant.image, Image)
+
+    def test_process_color_variants_cmy(self, mock_loader, mock_displayer, sample_image):
+        """Test _process_color_variants creates CMY variants when configured."""
+        with patch('src.infrastructure.cli.app.setup_logging'):
+            with patch('src.infrastructure.cli.app.get_logger') as mock_get_logger:
+                mock_logger = MagicMock()
+                mock_get_logger.return_value = mock_logger
+
+                app = CLIApp(
+                    loader=mock_loader,
+                    displayer=mock_displayer,
+                    color_mode="CMY",
+                )
+                app._logger = mock_logger
+
+        analysis = app._process_color_variants(sample_image)
+
+        assert analysis.mode == "CMY"
+        names = [variant.label for variant in analysis.variants]
+        assert "CANAL CIAN" in names
+        assert "CANAL MAGENTA" in names
+        assert "CANAL AMARILLO" in names
 
     def test_display_grid_2x4(self, app, sample_image):
         """Test _display_grid_2x4 calls displayer correctly."""
-        variants = [
-            ("Canal Rojo", Mock()),
-            ("Canal Verde", Mock()),
-            ("Canal Azul", Mock()),
-            ("Gris", Mock()),
-            ("R->Gris", Mock()),
-            ("V->Gris", Mock()),
-            ("A->Gris", Mock())
-        ]
-        
-        app._display_grid_2x4(sample_image, variants)
+        analysis = ColorAnalysisResult(
+            mode="RGB",
+            debug_title="DEPURACION DE CANALES RGB",
+            channel_labels=("Canal Rojo", "Canal Verde", "Canal Azul"),
+            channel_pixel_labels=("Rojo", "Verde", "Azul"),
+            analysis_title="Analisis RGB: test.png",
+            variants=[
+                ColorAnalysisVariant("CANAL ROJO", Mock()),
+                ColorAnalysisVariant("CANAL VERDE", Mock()),
+                ColorAnalysisVariant("CANAL AZUL", Mock()),
+                ColorAnalysisVariant("ESCALA DE GRISES", Mock()),
+                ColorAnalysisVariant("ROJO -> GRIS", Mock()),
+                ColorAnalysisVariant("VERDE -> GRIS", Mock()),
+                ColorAnalysisVariant("AZUL -> GRIS", Mock()),
+            ],
+        )
+
+        app._display_grid_2x4(sample_image, analysis)
         
         # Should call display_grid with 8 images
         app._displayer.display_grid.assert_called_once()
@@ -203,6 +242,7 @@ class TestCLIAppColorChannelAnalysis:
         # Check 8 images provided
         images = call_args[1]['images']
         assert len(images) == 8
+        assert call_args[1]['title'] == 'Analisis RGB: test.png'
 
 
 class TestCLIAppStandardRun:

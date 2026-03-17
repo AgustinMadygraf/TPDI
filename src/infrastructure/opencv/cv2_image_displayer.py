@@ -2,7 +2,7 @@
 Path: src/infrastructure/opencv/cv2_image_displayer.py
 """
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import cv2
 from src.infrastructure.numpy.image_adapter import NumPyImageAdapter
 from src.infrastructure.shared.logger import get_logger
@@ -27,11 +27,19 @@ class CV2ImageDisplayer(ImageDisplayPort):
         return data
 
     def display(
-        self, image: Image, comparison: Image = None, layout: str = "vertical"
+        self,
+        image: Image,
+        comparison: Image = None,
+        layout: str = "vertical",
+        comparison_labels: Optional[Tuple[str, str]] = None,
     ) -> None:
         data = self._numpy_adapter.to_numpy(image)
 
         if comparison:
+            main_label, comparison_label = comparison_labels or (
+                "ORIGINAL",
+                "ESCALA DE GRISES",
+            )
             comp_data = self._numpy_adapter.to_numpy(comparison)
             if data.shape[:2] != comp_data.shape[:2]:
                 comp_data = self._numpy_adapter.resize(
@@ -47,7 +55,7 @@ class CV2ImageDisplayer(ImageDisplayPort):
 
             cv2.putText(
                 label_original,
-                "ORIGINAL",
+                main_label,
                 (10, 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
@@ -56,7 +64,7 @@ class CV2ImageDisplayer(ImageDisplayPort):
             )
             cv2.putText(
                 label_modified,
-                "ESCALA DE GRISES",
+                comparison_label,
                 (10, 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,

@@ -52,10 +52,7 @@ class TestCV2ImageLoader:
         assert len(result.data) == 50 * 80
 
     def test_load_rgba_image(self, temp_directory, loader):
-        """Test loading an RGBA (4-channel) image.
-        
-        Note: OpenCV loads PNG with alpha as BGRA by default, preserving 4 channels.
-        """
+        """Test loading RGBA image normalizes to internal RGB contract."""
         img_path = temp_directory / "test_rgba.png"
         # Create RGBA image with explicit alpha channel
         img_data = np.random.randint(0, 256, (100, 100, 4), dtype=np.uint8)
@@ -63,9 +60,21 @@ class TestCV2ImageLoader:
         
         result = loader.load(img_path)
         
-        # OpenCV loads PNG with alpha as 4-channel (BGRA -> converted to RGBA)
-        assert result.channels in [3, 4]  # Depends on OpenCV build and flags
-        assert len(result.data) == 100 * 100 * result.channels
+        assert result.channels == 3
+        assert len(result.data) == 100 * 100 * 3
+
+    def test_color_conversion_bgra_to_rgb_discards_alpha(self, temp_directory, loader):
+        """Test that BGRA is normalized to RGB (alpha channel discarded)."""
+        img_path = temp_directory / "test_bgra.png"
+        img_data = np.zeros((1, 1, 4), dtype=np.uint8)
+        # BGRA pixel equivalent to red with custom alpha.
+        img_data[0, 0] = [0, 0, 255, 17]
+        cv2.imwrite(str(img_path), img_data)
+
+        result = loader.load(img_path)
+
+        assert result.channels == 3
+        assert result.data[:3] == [255, 0, 0]
 
     def test_load_nonexistent_file(self, loader):
         """Test loading a non-existent file raises ValueError."""

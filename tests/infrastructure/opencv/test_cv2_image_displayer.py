@@ -229,6 +229,26 @@ class TestCV2ImageDisplayerComparison:
         assert any("ORIGINAL" in text for text in texts)
         assert any("ESCALA DE GRISES" in text for text in texts)
 
+    @patch('src.infrastructure.opencv.cv2_image_displayer.cv2')
+    @patch('src.infrastructure.opencv.cv2_image_displayer.get_logger')
+    def test_comparison_accepts_custom_labels(self, mock_get_logger, mock_cv2, displayer, sample_rgb_image, grayscale_image):
+        """Test that comparison allows overriding default labels."""
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+        setup_cv2_mock(mock_cv2)
+
+        displayer.display(
+            sample_rgb_image,
+            grayscale_image,
+            layout="vertical",
+            comparison_labels=("BASE", "VARIANTE"),
+        )
+
+        calls = mock_cv2.putText.call_args_list
+        texts = [str(call) for call in calls]
+        assert any("BASE" in text for text in texts)
+        assert any("VARIANTE" in text for text in texts)
+
     def test_initialization(self):
         """Test displayer initialization."""
         with patch('src.infrastructure.opencv.cv2_image_displayer.get_logger') as mock_get_logger:

@@ -3,18 +3,37 @@ Unit tests for ImageDisplayPort protocol.
 Path: tests/use_cases/test_display_image.py
 """
 
+from typing import List, Optional, Tuple
+
 from src.entities.image import Image
 from src.use_cases.display_image import ImageDisplayPort
 
 
-class MockImageDisplayer(ImageDisplayPort):
+class MockImageDisplayer:
     """Mock implementation of ImageDisplayPort for testing."""
     
     def __init__(self):
         self.displayed_images = []
     
-    def display(self, image: Image) -> None:
+    def display(
+        self,
+        image: Image,
+        comparison: Optional[Image] = None,
+        layout: str = "vertical",
+        comparison_labels: Optional[Tuple[str, str]] = None,
+    ) -> None:
+        _ = (comparison, layout, comparison_labels)
         self.displayed_images.append(image)
+
+    def display_grid(
+        self,
+        images: List[Tuple[Image, str]],
+        grid_size: Tuple[int, int] = (2, 2),
+        title: str = "Grid",
+    ) -> None:
+        _ = (grid_size, title)
+        for image, _ in images:
+            self.displayed_images.append(image)
 
 
 class TestImageDisplayPort:
