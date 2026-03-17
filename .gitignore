@@ -1,5 +1,35 @@
+# Virtual environment
 venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Test coverage
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data directories (except .gitkeep)
+data/
 !data/input/.gitkeep
 !data/output/.gitkeep
-data/
-__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
