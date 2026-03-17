@@ -24,6 +24,10 @@ dist/
 .idea/
 *.swp
 *.swo
+.pylintrc
+
+# VS Code (configuración local, no versionar)
+.vscode/settings.json
 
 # Data directories (except .gitkeep)
 data/

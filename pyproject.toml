@@ -13,11 +13,17 @@ dependencies = [
     "Pillow>=10.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
 [tool.pylint.MASTER]
 ignore = ["venv", ".venv", "__pycache__"]
 
 [tool.pylint.TYPECHECK]
-generated-members = ["cv2.*", "numpy.*"]
+generated-members = ["cv2.*", "numpy.*", "pytest.*"]
 
 [tool.pylint.messages_control]
 disable = [
@@ -26,6 +32,9 @@ disable = [
     "missing-function-docstring",
     "too-few-public-methods",
 ]
+
+[tool.pylint.messages_control.per-file-ignores]
+"tests/**" = ["import-error", "unused-argument"]
 
 [tool.mypy]
 ignore_missing_imports = true

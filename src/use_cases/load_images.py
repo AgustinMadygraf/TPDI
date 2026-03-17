@@ -9,7 +9,7 @@ from src.entities.image import Image
 class ImageLoaderPort(Protocol):
     "Puerto para cargar imágenes desde el sistema de archivos."
     def load(self, path: Path) -> Image:
-        """Carga una imagen desde la ruta especificada."""
+        "Carga una imagen desde la ruta especificada."
         raise NotImplementedError
 
 class LoadImagesFromDirectory:
@@ -41,5 +41,4 @@ class LoadImagesFromDirectory:
                 except (ValueError, OSError) as exc:
                     if self._on_error:
                         self._on_error(file_path, exc)
-
         return images

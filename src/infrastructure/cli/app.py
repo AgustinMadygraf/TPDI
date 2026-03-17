@@ -3,7 +3,6 @@ Path: src/infrastructure/cli/app.py
 """
 
 from pathlib import Path
-
 from src.infrastructure.settings.logger import setup_logging, get_logger
 from src.interface_adapters.controllers.main_controller import MainController
 from src.interface_adapters.gateways.image_gateway import ImageGateway
@@ -11,21 +10,13 @@ from src.use_cases.load_images import ImageLoaderPort
 from src.use_cases.display_image import ImageDisplayPort
 from src.entities.image import Image
 
-
 class CLIApp:
-    """Aplicación de línea de comandos para TPDI."""
-
+    "Aplicación de línea de comandos para TPDI."
     def __init__(
         self,
         loader: ImageLoaderPort,
         displayer: ImageDisplayPort
     ):
-        """Inicializa la aplicación CLI.
-
-        Args:
-            loader: Adaptador para cargar imágenes.
-            displayer: Adaptador para mostrar imágenes.
-        """
         setup_logging(name="tpdi")
         self._logger = get_logger(__name__)
         self._displayer = displayer
@@ -40,11 +31,11 @@ class CLIApp:
         )
 
     def _on_load_error(self, path: Path, exc: Exception) -> None:
-        """Callback para manejar errores de carga de imágenes."""
+        "Callback para manejar errores de carga de imágenes."
         self._logger.warning("No se pudo cargar imagen %s: %s", path, exc)
 
     def run(self) -> None:
-        """Ejecuta la aplicación CLI."""
+        "Ejecuta la aplicación CLI."
         self._logger.info("=" * 50)
         self._logger.info("TPDI - Procesamiento Digital de Imágenes")
         self._logger.info("=" * 50)
@@ -66,7 +57,6 @@ class CLIApp:
                             img_info["width"],
                             img_info["height"],
                             img_info["channels"])
-
         first_image = self._controller.get_image(0)
         if first_image:
             self._display_image(first_image)
@@ -74,6 +64,11 @@ class CLIApp:
         self._logger.info("Visor cerrado. Aplicación finalizada.")
 
     def _display_image(self, image: Image) -> None:
-        """Muestra una imagen usando el displayer."""
+        "Muestra una imagen usando el displayer."
         self._logger.info("Mostrando imagen: %s", image.name)
         self._displayer.display(image)
+
+    def _display_comparison(self, original: Image, modified: Image) -> None:
+        "Muestra comparación lado a lado de dos imágenes."
+        self._logger.info("Mostrando comparacion: %s", original.name)
+        self._displayer.display(original, modified)
