@@ -3,28 +3,25 @@ Path: src/entities/image.py
 """
 
 from dataclasses import dataclass
-from typing import Optional
-import numpy as np
+from typing import List, Optional, Tuple
 
 
 @dataclass
 class Image:
-    "Entidad que representa una imagen cargada en memoria."
     name: str
-    data: np.ndarray
+    width: int
+    height: int
+    channels: int
+    data: List[int]
     path: Optional[str] = None
 
     @property
-    def width(self) -> int:
-        "Ancho de la imagen en píxeles."
-        return self.data.shape[1]
+    def size(self) -> int:
+        return self.width * self.height * self.channels
 
-    @property
-    def height(self) -> int:
-        "Alto de la imagen en píxeles."
-        return self.data.shape[0]
+    def get_pixel(self, x: int, y: int) -> Tuple[int, ...]:
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            raise ValueError(f"Coordenadas fuera de rango: ({x}, {y})")
 
-    @property
-    def channels(self) -> int:
-        "Número de canales de color."
-        return 1 if len(self.data.shape) == 2 else self.data.shape[2]
+        idx = (y * self.width + x) * self.channels
+        return tuple(self.data[idx:idx + self.channels])

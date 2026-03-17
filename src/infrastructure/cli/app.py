@@ -6,7 +6,7 @@ from src.entities.image import Image
 from src.infrastructure.opencv import CV2ImageAdapter
 from src.infrastructure.settings.logger import setup_logging, get_logger
 from src.interface_adapters.controllers.main_controller import MainController
-from src.interface_adapters.gateways import ImageGateway
+from src.interface_adapters.gateways.image_gateway import ImageGateway
 
 
 class CLIApp:
