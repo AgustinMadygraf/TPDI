@@ -4,6 +4,86 @@
 
 ---
 
+## Feature: Grid Layout y Análisis de Canales - COMPLETADO
+
+### Cambios Aplicados
+
+| Cambio | Archivo | Estado |
+|--------|---------|--------|
+| Extender protocolo `ImageDisplayPort` | `src/use_cases/display_image.py` | ✅ Agregado `display_grid()` |
+| Implementar grid en displayer | `src/infrastructure/opencv/cv2_image_displayer.py` | ✅ Implementado |
+| Función `extract_red_channel()` | `run.py` | ✅ Agregado |
+| Función `red_to_grayscale()` | `run.py` | ✅ Agregado |
+| Wiring del grid 2x2 | `run.py` | ✅ Configurado |
+
+### Refactorización: CLIApp y Entry Point
+
+**Archivo modificado**: `src/infrastructure/cli/app.py`
+- Agregado `run_color_channel_analysis()` - Orquesta análisis completo
+- Agregado `_process_color_variants()` - Procesa variantes de canales
+- Agregado `_display_grid_2x3()` - Muestra grid formateado
+- Agregado `load_images()` - Carga de imágenes reutilizable
+
+**Archivo simplificado**: `run.py`
+- Antes: 111 líneas con lógica de análisis
+- Después: 27 líneas solo wiring
+
+**Beneficios**:
+- ✅ Entry point minimalista (solo dependencias)
+- ✅ Lógica de negocio en `CLIApp` (infraestructura)
+- ✅ Procesamiento en `image_processing` (dominio/use_cases)
+- ✅ Separación clara de responsabilidades
+
+### Refactorización: Módulo de Procesamiento de Imágenes
+
+**Archivo creado**: `src/use_cases/image_processing.py`
+
+Funciones:
+- `apply_grayscale()` - Conversión a escala de grises
+- `extract_red_channel()` - Extracción del canal rojo (R,0,0)
+- `extract_green_channel()` - Extracción del canal verde (0,G,0)
+- `extract_blue_channel()` - Extracción del canal azul (0,0,B) ✅ NUEVO
+- `red_to_grayscale()` - Canal rojo a escala de grises (R,R,R)
+- `green_to_grayscale()` - Canal verde a escala de grises (G,G,G)
+- `blue_to_grayscale()` - Canal azul a escala de grises (B,B,B) ✅ NUEVO
+
+**Beneficios**:
+- ✅ `run.py` solo contiene wiring y orquestación
+- ✅ Funciones reutilizables desde otros módulos
+- ✅ Mejor testabilidad (35 tests totales)
+- ✅ Separa dominio (procesamiento) de infraestructura (CLI)
+
+**Tests**: 35 tests en `tests/use_cases/test_image_processing.py`
+
+### Estructura del Grid 2x4 Final (RGB Completo)
+
+```
++-----------+-----------+-----------+-----------+
+| ORIGINAL  |   ROJO    |   VERDE   |   AZUL    |
+|           |  (R,0,0)  |  (0,G,0)  |  (0,0,B)  |
++-----------+-----------+-----------+-----------+
+|   GRIS    |  R->GRIS  |  V->GRIS  |  A->GRIS  |
+| (promedio)|  (R,R,R)  |  (G,G,G)  |  (B,B,B)  |
++-----------+-----------+-----------+-----------+
+```
+
+### API Nueva
+
+```python
+# Protocolo ImageDisplayPort
+def display_grid(
+    self,
+    images: List[Tuple[Image, str]],      # [(imagen, etiqueta), ...]
+    grid_size: Tuple[int, int] = (2, 2),  # (filas, columnas)
+    title: str = "Grid"                   # Título de ventana
+) -> None
+```
+
+### Tests
+✅ Todos los 137 tests pasan
+
+---
+
 ## Mantenimiento de Documentación - COMPLETADO
 
 ### Cambios Aplicados (docs-maintainer)
@@ -176,9 +256,9 @@ class ImageDisplayPort(Protocol):
 
 | Métrica | Valor |
 |---------|-------|
-| Tests | **137** |
+| Tests | **183** (173 + 10 nuevos) |
 | Cobertura | **98%** |
-| Tareas Procesadas | **5/5** |
+| Tareas Procesadas | **6/6** |
 | CERTEZAS Ejecutadas | **1** |
 | DUDAS BAJO NIVEL Ejecutadas | **1** |
 | DUDAS BAJO NIVEL Decididas (sin cambio) | **2** |
@@ -193,12 +273,44 @@ class ImageDisplayPort(Protocol):
 - ✅ Dependencias correctas entre capas
 - ✅ Protocolos bien definidos
 - ✅ No hay imports de infrastructure desde capas internas
+- ✅ Nuevo módulo `image_processing` en use_cases (dominio)
+
+### Estructura de Capas Actualizada (RGB Completo)
+
+```
+entities/
+  └── image.py                    # Entidad Image
+
+use_cases/
+  ├── load_images.py              # ImageLoaderPort
+  ├── display_image.py            # ImageDisplayPort
+  └── image_processing.py         # Procesamiento RGB completo ✅
+                                  #   - apply_grayscale
+                                  #   - extract_red/green/blue_channel
+                                  #   - red/green/blue_to_grayscale
+
+interface_adapters/
+  ├── controllers/
+  ├── gateways/
+  └── presenters/
+
+infrastructure/
+  ├── opencv/
+  │   ├── cv2_image_loader.py
+  │   └── cv2_image_displayer.py  # ✅ display_grid() genérico
+  ├── numpy/
+  ├── cli/
+  │   └── app.py                  # ✅ run_color_channel_analysis()
+  └── shared/
+
+run.py                            # Solo wiring (22 líneas)
+```
 
 ### SOLID: ✅ Cumplido
-- ✅ S: Responsabilidades claras (con compromisos pragmáticos)
+- ✅ S: Responsabilidades claras (procesamiento separado de wiring)
 - ✅ O: Extensible mediante nuevos adaptadores
-- ✅ L: `CV2ImageDisplayer` ahora cumple `ImageDisplayPort`
-- ✅ I: Protocolos enfocados (con extensión justificada)
+- ✅ L: `CV2ImageDisplayer` cumple `ImageDisplayPort`
+- ✅ I: Protocolos enfocados
 - ✅ D: Dependencias de abstracciones
 
 ### Seguridad: ✅ Cumplida

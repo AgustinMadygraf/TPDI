@@ -47,8 +47,7 @@ class TestCLIApp:
                 app = CLIApp(loader=mock_loader, displayer=mock_displayer)
                 
                 assert app._displayer == mock_displayer
-                assert app._gateway is not None
-                assert app._controller is not None
+                assert app._loader == mock_loader
 
     def test_on_load_error_logs_warning(self, app):
         """Test that load error logs warning."""
@@ -61,119 +60,200 @@ class TestCLIApp:
             "No se pudo cargar imagen %s: %s", test_path, test_error
         )
 
-    @patch.object(CLIApp, '_display_image')
-    def test_run_with_images(self, mock_display, app, mock_loader):
-        """Test run when images are found."""
-        # Mock controller to return summary with images
+    def test_load_images(self, app, mock_loader):
+        """Test load_images method."""
         test_images = [
             Image(name="test.png", width=100, height=100, channels=3, data=[0]*30000, path="/tmp/test.png")
         ]
+        mock_loader.load.return_value = test_images[0]
         
-        with patch.object(app._controller, 'load_default_images') as mock_load:
-            mock_load.return_value = {
-                "count": 1,
-                "images": [{"name": "test.png", "width": 100, "height": 100, "channels": 3}]
-            }
-            with patch.object(app._controller, 'get_image') as mock_get:
-                mock_get.return_value = test_images[0]
-                
-                app.run()
-                
-                # Should display the first image
-                mock_display.assert_called_once()
-
-    @patch.object(CLIApp, '_display_image')
-    def test_run_no_images(self, mock_display, app):
-        """Test run when no images are found."""
-        with patch.object(app._controller, 'load_default_images') as mock_load:
-            mock_load.return_value = {"count": 0, "images": []}
+        with patch('src.infrastructure.cli.app.LoadImagesFromDirectory') as mock_use_case:
+            mock_instance = Mock()
+            mock_instance.execute.return_value = test_images
+            mock_use_case.return_value = mock_instance
             
-            app.run()
+            result = app.load_images()
             
-            # Should log warning and not display anything
-            app._logger.warning.assert_called_with(
-                "No se encontraron imágenes en: %s", 
-                app._gateway._base_path.absolute()
-            )
-            mock_display.assert_not_called()
+            assert result == test_images
 
-    def test_display_image(self, app, mock_displayer):
-        """Test _display_image method."""
-        test_image = Image(
-            name="test.png", 
-            width=100, 
-            height=100, 
-            channels=3, 
-            data=[0]*30000, 
+
+class TestCLIAppColorChannelAnalysis:
+    """Test suite for color channel analysis feature."""
+
+    @pytest.fixture
+    def mock_loader(self):
+        """Provides a mock image loader."""
+        return Mock()
+
+    @pytest.fixture
+    def mock_displayer(self):
+        """Provides a mock image displayer."""
+        return Mock()
+
+    @pytest.fixture
+    def app(self, mock_loader, mock_displayer):
+        """Provides a CLIApp instance with mocked dependencies."""
+        with patch('src.infrastructure.cli.app.setup_logging'):
+            with patch('src.infrastructure.cli.app.get_logger') as mock_get_logger:
+                mock_logger = MagicMock()
+                mock_get_logger.return_value = mock_logger
+                
+                app = CLIApp(loader=mock_loader, displayer=mock_displayer)
+                app._logger = mock_logger
+                return app
+
+    @pytest.fixture
+    def sample_image(self):
+        """Provides a sample RGB image."""
+        return Image(
+            name="test.png",
+            width=100,
+            height=100,
+            channels=3,
+            data=[255, 128, 64] * 10000,  # Mixed colors
             path="/tmp/test.png"
         )
-        
-        app._display_image(test_image)
-        
-        mock_displayer.display.assert_called_once_with(test_image)
-        app._logger.info.assert_any_call("Mostrando imagen: %s", "test.png")
 
-    def test_run_logs_startup_info(self, app):
-        """Test that run logs startup information."""
-        with patch.object(app._controller, 'load_default_images') as mock_load:
-            mock_load.return_value = {"count": 0, "images": []}
+    def test_run_color_channel_analysis_no_images(self, app):
+        """Test analysis when no images are found."""
+        with patch.object(app, 'load_images') as mock_load:
+            mock_load.return_value = []
+            
+            result = app.run_color_channel_analysis()
+            
+            assert result is False
+
+    def test_run_color_channel_analysis_with_images(self, app, sample_image):
+        """Test analysis when images are found."""
+        with patch.object(app, 'load_images') as mock_load:
+            mock_load.return_value = [sample_image]
+            
+            with patch.object(app, '_process_color_variants') as mock_process:
+                mock_process.return_value = [
+                    ("Canal Rojo", Mock()),
+                    ("Canal Verde", Mock()),
+                    ("Canal Azul", Mock()),
+                    ("Gris", Mock()),
+                    ("R->Gris", Mock()),
+                    ("V->Gris", Mock()),
+                    ("A->Gris", Mock())
+                ]
+                
+                with patch.object(app, '_display_grid_2x4') as mock_display:
+                    result = app.run_color_channel_analysis()
+                    
+                    assert result is True
+                    mock_process.assert_called_once_with(sample_image)
+                    mock_display.assert_called_once()
+
+    def test_process_color_variants(self, app, sample_image):
+        """Test _process_color_variants creates correct variants."""
+        variants = app._process_color_variants(sample_image)
+        
+        assert len(variants) == 7
+        
+        # Check names
+        names = [name for name, _ in variants]
+        assert "Canal Rojo (R,0,0)" in names
+        assert "Canal Verde (0,G,0)" in names
+        assert "Canal Azul (0,0,B)" in names
+        assert "Escala de grises" in names
+        assert "Rojo -> Gris" in names
+        assert "Verde -> Gris" in names
+        assert "Azul -> Gris" in names
+        
+        # Check all are Image instances
+        for _, img in variants:
+            assert isinstance(img, Image)
+
+    def test_display_grid_2x4(self, app, sample_image):
+        """Test _display_grid_2x4 calls displayer correctly."""
+        variants = [
+            ("Canal Rojo", Mock()),
+            ("Canal Verde", Mock()),
+            ("Canal Azul", Mock()),
+            ("Gris", Mock()),
+            ("R->Gris", Mock()),
+            ("V->Gris", Mock()),
+            ("A->Gris", Mock())
+        ]
+        
+        app._display_grid_2x4(sample_image, variants)
+        
+        # Should call display_grid with 8 images
+        app._displayer.display_grid.assert_called_once()
+        call_args = app._displayer.display_grid.call_args
+        
+        # Check grid_size is 2x4
+        assert call_args[1]['grid_size'] == (2, 4)
+        
+        # Check 8 images provided
+        images = call_args[1]['images']
+        assert len(images) == 8
+
+
+class TestCLIAppStandardRun:
+    """Test suite for standard run method."""
+
+    @pytest.fixture
+    def mock_loader(self):
+        """Provides a mock image loader."""
+        return Mock()
+
+    @pytest.fixture
+    def mock_displayer(self):
+        """Provides a mock image displayer."""
+        return Mock()
+
+    @pytest.fixture
+    def app(self, mock_loader, mock_displayer):
+        """Provides a CLIApp instance with mocked dependencies."""
+        with patch('src.infrastructure.cli.app.setup_logging'):
+            with patch('src.infrastructure.cli.app.get_logger') as mock_get_logger:
+                mock_logger = MagicMock()
+                mock_get_logger.return_value = mock_logger
+                
+                app = CLIApp(loader=mock_loader, displayer=mock_displayer)
+                app._logger = mock_logger
+                return app
+
+    @pytest.fixture
+    def sample_image(self):
+        """Provides a sample image."""
+        return Image(
+            name="test.png",
+            width=100,
+            height=100,
+            channels=3,
+            data=[0] * 30000,
+            path="/tmp/test.png"
+        )
+
+    def test_run_with_images(self, app, sample_image):
+        """Test run when images are found."""
+        with patch.object(app, 'load_images') as mock_load:
+            mock_load.return_value = [sample_image]
+            
+            with patch.object(app, '_display_image') as mock_display:
+                app.run()
+                
+                mock_display.assert_called_once_with(sample_image)
+
+    def test_run_no_images(self, app):
+        """Test run when no images are found."""
+        with patch.object(app, 'load_images') as mock_load:
+            mock_load.return_value = []
             
             app.run()
             
-            # Should log app startup
-            app._logger.info.assert_any_call("=" * 50)
-            app._logger.info.assert_any_call("TPDI - Procesamiento Digital de Imágenes")
+            app._logger.warning.assert_called_with(
+                "No se encontraron imagenes en: %s", 
+                app._base_path
+            )
 
-    def test_run_logs_image_info(self, app):
-        """Test that run logs image information."""
-        with patch.object(app._controller, 'load_default_images') as mock_load:
-            mock_load.return_value = {
-                "count": 2,
-                "images": [
-                    {"name": "img1.png", "width": 100, "height": 200, "channels": 3},
-                    {"name": "img2.png", "width": 300, "height": 400, "channels": 1}
-                ]
-            }
-            with patch.object(app._controller, 'get_image') as mock_get:
-                mock_get.return_value = Image(
-                    name="img1.png", width=100, height=200, channels=3, data=[0]*60000, path="/tmp/img1.png"
-                )
-                
-                app.run()
-                
-                # Should log each image info
-                app._logger.info.assert_any_call(
-                    "  [%s] %dx%d px, %d canal(es)",
-                    "img1.png", 100, 200, 3
-                )
-
-    def test_run_logs_completion(self, app):
-        """Test that run logs completion message."""
-        with patch.object(app._controller, 'load_default_images') as mock_load:
-            mock_load.return_value = {
-                "count": 1,
-                "images": [{"name": "test.png", "width": 100, "height": 100, "channels": 3}]
-            }
-            with patch.object(app._controller, 'get_image') as mock_get:
-                mock_get.return_value = Image(
-                    name="test.png", width=100, height=100, channels=3, data=[0]*30000, path="/tmp/test.png"
-                )
-                
-                app.run()
-                
-                app._logger.info.assert_any_call("Visor cerrado. Aplicación finalizada.")
-
-    def test_run_handles_no_first_image(self, app):
-        """Test run when get_image returns None."""
-        with patch.object(app._controller, 'load_default_images') as mock_load:
-            mock_load.return_value = {
-                "count": 1,
-                "images": [{"name": "test.png", "width": 100, "height": 100, "channels": 3}]
-            }
-            with patch.object(app._controller, 'get_image') as mock_get:
-                mock_get.return_value = None
-                
-                with patch.object(app, '_display_image') as mock_display:
-                    app.run()
-                    
-                    mock_display.assert_not_called()
+    def test_display_image(self, app, mock_displayer, sample_image):
+        """Test _display_image method."""
+        app._display_image(sample_image)
+        
+        mock_displayer.display.assert_called_once_with(sample_image)
+        app._logger.info.assert_any_call("Mostrando imagen: %s", "test.png")

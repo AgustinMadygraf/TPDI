@@ -2,14 +2,18 @@
 Path: src/infrastructure/opencv/cv2_image_displayer.py
 """
 
+from typing import List, Tuple
+
 import cv2
 from src.infrastructure.numpy.image_adapter import NumPyImageAdapter
 from src.infrastructure.settings.logger import get_logger
 from src.use_cases.display_image import ImageDisplayPort
 from src.entities.image import Image
 
+
 class CV2ImageDisplayer(ImageDisplayPort):
     "Muestra imágenes usando OpenCV."
+
     def __init__(self):
         "Inicializa el displayer."
         self._logger = get_logger(__name__)
@@ -56,6 +60,83 @@ class CV2ImageDisplayer(ImageDisplayPort):
             display_data = self._prepare_for_display(data)
             cv2.imshow(image.name, display_data)
             self._logger.info("Mostrando: %s", image.name)
+
+        self._logger.info("Presiona cualquier tecla para cerrar...")
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    def display_grid(
+        self,
+        images: List[Tuple[Image, str]],
+        grid_size: Tuple[int, int] = (2, 2),
+        title: str = "Grid"
+    ) -> None:
+        """Muestra múltiples imágenes en una cuadrícula.
+
+        Args:
+            images: Lista de tuplas (imagen, etiqueta).
+            grid_size: Tupla (filas, columnas) para el grid.
+            title: Título de la ventana.
+        """
+        rows, cols = grid_size
+        label_height = 30
+
+        # Preparar todas las imágenes con sus etiquetas
+        cells = []
+        for img, label in images:
+            data = self._numpy_adapter.to_numpy(img)
+            display_data = self._prepare_for_display(data)
+
+            # Crear etiqueta
+            height, width = display_data.shape[:2]
+            label_img = self._numpy_adapter.zeros((label_height, width, 3))
+            cv2.putText(label_img, label, (10, 20),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+            # Combinar etiqueta + imagen
+            cell = self._numpy_adapter.vstack([label_img, display_data])
+            cells.append(cell)
+
+        # Determinar tamaño de celda (usar el máximo para uniformidad)
+        if not cells:
+            self._logger.warning("No hay imágenes para mostrar en grid")
+            return
+
+        max_height = max(cell.shape[0] for cell in cells)
+        max_width = max(cell.shape[1] for cell in cells)
+
+        # Normalizar todas las celdas al mismo tamaño
+        normalized_cells = []
+        for cell in cells:
+            if cell.shape[0] != max_height or cell.shape[1] != max_width:
+                normalized = self._numpy_adapter.resize(cell, (max_width, max_height))
+            else:
+                normalized = cell
+            normalized_cells.append(normalized)
+
+        # Rellenar celdas vacías si es necesario
+        total_cells = rows * cols
+        while len(normalized_cells) < total_cells:
+            empty_cell = self._numpy_adapter.zeros((max_height, max_width, 3))
+            normalized_cells.append(empty_cell)
+
+        # Construir el grid fila por fila
+        grid_rows = []
+        for row_idx in range(rows):
+            start_idx = row_idx * cols
+            end_idx = start_idx + cols
+            row_cells = normalized_cells[start_idx:end_idx]
+
+            # Concatenar horizontalmente
+            if row_cells:
+                row_img = self._numpy_adapter.hstack(row_cells)
+                grid_rows.append(row_img)
+
+        # Concatenar verticalmente todas las filas
+        if grid_rows:
+            grid_img = self._numpy_adapter.vstack(grid_rows)
+            cv2.imshow(title, grid_img)
+            self._logger.info("Mostrando grid %dx%d: %s", rows, cols, title)
 
         self._logger.info("Presiona cualquier tecla para cerrar...")
         cv2.waitKey(0)
