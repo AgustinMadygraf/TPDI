@@ -9,8 +9,10 @@ from src.infrastructure.shared.path_validator import PathValidator
 from src.use_cases.load_images import ImageLoaderPort
 from src.entities.image import Image
 
+
 class CV2ImageLoader(ImageLoaderPort):
     "Carga imágenes usando OpenCV."
+
     def __init__(self, path_validator: PathValidator):
         self._path_validator = path_validator
         self._numpy_adapter = NumPyImageAdapter()
@@ -27,7 +29,5 @@ class CV2ImageLoader(ImageLoaderPort):
             data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
 
         return self._numpy_adapter.from_numpy(
-            name=validated_path.name,
-            data=data,
-            path=str(validated_path)
+            name=validated_path.name, data=data, path=str(validated_path)
         )

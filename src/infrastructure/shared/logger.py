@@ -1,13 +1,15 @@
 """
 Path: src/infrastructure/shared/logger.py
 """
+
 import logging
 import sys
 from datetime import datetime
 
 
 class FastAPIFormatter(logging.Formatter):
-    "Formatter con colores y formato HH:MM:SS,d (décimas)."    
+    "Formatter con colores y formato HH:MM:SS,d (décimas)."
+
     COLORS = {
         "DEBUG": "\033[36m",
         "INFO": "\033[32m",
@@ -45,13 +47,16 @@ def setup_logging(name: str = "tpdi", level: int = logging.INFO) -> logging.Logg
     if sys.stdout.isatty():
         handler.setFormatter(FastAPIFormatter())
     else:
-        handler.setFormatter(logging.Formatter(
-            "%(asctime)s | %(levelname)-8s | %(name)s: %(message)s",
-            datefmt="%H:%M:%S"
-        ))
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s | %(levelname)-8s | %(name)s: %(message)s",
+                datefmt="%H:%M:%S",
+            )
+        )
 
     logger.addHandler(handler)
     return logger
+
 
 def get_logger(name: str) -> logging.Logger:
     "Obtiene un logger configurado."

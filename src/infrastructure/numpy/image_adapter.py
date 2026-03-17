@@ -6,8 +6,10 @@ from typing import List, Tuple
 import numpy as np
 from src.entities.image import Image
 
+
 class NumPyImageAdapter:
-    " Adapter to convert between Image and NumPy array formats."
+    "Adapter to convert between Image and NumPy array formats."
+
     @staticmethod
     def to_numpy(image: "Image") -> np.ndarray:
         if image.channels == 1:
@@ -30,7 +32,7 @@ class NumPyImageAdapter:
             height=height,
             channels=channels,
             data=flat_data,
-            path=path
+            path=path,
         )
 
     @staticmethod
@@ -47,7 +49,7 @@ class NumPyImageAdapter:
 
     @staticmethod
     def resize(data: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
-        " Resize an image by cropping or padding to fit the target size."
+        "Resize an image by cropping or padding to fit the target size."
         target_width, target_height = size
         current_height, current_width = data.shape[:2]
         channels = 1 if len(data.shape) == 2 else data.shape[2]
@@ -65,10 +67,19 @@ class NumPyImageAdapter:
         copy_width = min(current_width, target_width)
 
         if channels == 1:
-            result[y_start:y_start+copy_height, x_start:x_start+copy_width] = \
-                data[y_src_start:y_src_start+copy_height, x_src_start:x_src_start+copy_width]
+            result[y_start : y_start + copy_height, x_start : x_start + copy_width] = (
+                data[
+                    y_src_start : y_src_start + copy_height,
+                    x_src_start : x_src_start + copy_width,
+                ]
+            )
         else:
-            result[y_start:y_start+copy_height, x_start:x_start+copy_width, :] = \
-                data[y_src_start:y_src_start+copy_height, x_src_start:x_src_start+copy_width, :]
+            result[
+                y_start : y_start + copy_height, x_start : x_start + copy_width, :
+            ] = data[
+                y_src_start : y_src_start + copy_height,
+                x_src_start : x_src_start + copy_width,
+                :,
+            ]
 
         return result

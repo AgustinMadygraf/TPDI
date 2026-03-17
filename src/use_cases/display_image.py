@@ -10,10 +10,7 @@ class ImageDisplayPort(Protocol):
     "Puerto para mostrar imágenes en pantalla."
 
     def display(
-        self,
-        image: Image,
-        comparison: Optional[Image] = None,
-        layout: str = "vertical"
+        self, image: Image, comparison: Optional[Image] = None, layout: str = "vertical"
     ) -> None:
         """Muestra la imagen en pantalla.
 
@@ -28,7 +25,7 @@ class ImageDisplayPort(Protocol):
         self,
         images: List[Tuple[Image, str]],
         grid_size: Tuple[int, int] = (2, 2),
-        title: str = "Grid"
+        title: str = "Grid",
     ) -> None:
         """Muestra múltiples imágenes en una cuadrícula.
 

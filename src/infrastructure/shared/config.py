@@ -16,20 +16,20 @@ class AppConfig:
     def __post_init__(self):
         # Validar que INPUT_DIR sea un Path válido
         if isinstance(self.INPUT_DIR, str):
-            object.__setattr__(self, 'INPUT_DIR', Path(self.INPUT_DIR))
+            object.__setattr__(self, "INPUT_DIR", Path(self.INPUT_DIR))
 
 
 def load_config(
     gui_backend: Literal["cv2", "matplotlib"] = None,
     input_dir: str | Path = None,
-    log_level: str = None
+    log_level: str = None,
 ) -> AppConfig:
-    kwargs = {}    
+    kwargs = {}
     if gui_backend is not None:
-        kwargs['GUI_BACKEND'] = gui_backend
+        kwargs["GUI_BACKEND"] = gui_backend
     if input_dir is not None:
-        kwargs['INPUT_DIR'] = input_dir
+        kwargs["INPUT_DIR"] = input_dir
     if log_level is not None:
-        kwargs['LOG_LEVEL'] = log_level
+        kwargs["LOG_LEVEL"] = log_level
 
     return AppConfig(**kwargs)

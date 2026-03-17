@@ -26,13 +26,17 @@ class CV2ImageDisplayer(ImageDisplayPort):
             data = cv2.cvtColor(data, cv2.COLOR_RGB2BGR)
         return data
 
-    def display(self, image: Image, comparison: Image = None, layout: str = "vertical") -> None:
+    def display(
+        self, image: Image, comparison: Image = None, layout: str = "vertical"
+    ) -> None:
         data = self._numpy_adapter.to_numpy(image)
 
         if comparison:
             comp_data = self._numpy_adapter.to_numpy(comparison)
             if data.shape[:2] != comp_data.shape[:2]:
-                comp_data = self._numpy_adapter.resize(comp_data, (data.shape[1], data.shape[0]))
+                comp_data = self._numpy_adapter.resize(
+                    comp_data, (data.shape[1], data.shape[0])
+                )
             data_display = self._prepare_for_display(data)
             comp_display = self._prepare_for_display(comp_data)
             _height = data_display.shape[0]
@@ -41,10 +45,24 @@ class CV2ImageDisplayer(ImageDisplayPort):
             label_original = self._numpy_adapter.zeros((label_height, width, 3))
             label_modified = self._numpy_adapter.zeros((label_height, width, 3))
 
-            cv2.putText(label_original, "ORIGINAL", (10, 20),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-            cv2.putText(label_modified, "ESCALA DE GRISES", (10, 20),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+            cv2.putText(
+                label_original,
+                "ORIGINAL",
+                (10, 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 255),
+                1,
+            )
+            cv2.putText(
+                label_modified,
+                "ESCALA DE GRISES",
+                (10, 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 255),
+                1,
+            )
             if layout == "vertical":
                 top = self._numpy_adapter.vstack([label_original, data_display])
                 bottom = self._numpy_adapter.vstack([label_modified, comp_display])
@@ -69,7 +87,7 @@ class CV2ImageDisplayer(ImageDisplayPort):
         self,
         images: List[Tuple[Image, str]],
         grid_size: Tuple[int, int] = (2, 2),
-        title: str = "Grid"
+        title: str = "Grid",
     ) -> None:
         "Muestra un grid de imágenes con etiquetas usando OpenCV."
         rows, cols = grid_size
@@ -84,8 +102,15 @@ class CV2ImageDisplayer(ImageDisplayPort):
             # Crear etiqueta
             _height, width = display_data.shape[:2]
             label_img = self._numpy_adapter.zeros((label_height, width, 3))
-            cv2.putText(label_img, label, (10, 20),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            cv2.putText(
+                label_img,
+                label,
+                (10, 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 255, 255),
+                1,
+            )
 
             # Combinar etiqueta + imagen
             cell = self._numpy_adapter.vstack([label_img, display_data])

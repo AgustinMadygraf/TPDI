@@ -6,21 +6,34 @@ from pathlib import Path
 from typing import Callable, List, Optional, Protocol, Set
 from src.entities.image import Image
 
+
 class ImageLoaderPort(Protocol):
     "Puerto para cargar imágenes desde el sistema de archivos."
+
     def load(self, path: Path) -> Image:
         "Carga una imagen desde la ruta especificada."
         raise NotImplementedError
 
+
 class LoadImagesFromDirectory:
     "Caso de uso: Cargar todas las imágenes de un directorio."
-    DEFAULT_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif', '.gif', '.webp'}
+
+    DEFAULT_EXTENSIONS = {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".bmp",
+        ".tiff",
+        ".tif",
+        ".gif",
+        ".webp",
+    }
 
     def __init__(
         self,
         image_loader: ImageLoaderPort,
         supported_extensions: Optional[Set[str]] = None,
-        on_error: Optional[Callable[[Path, Exception], None]] = None
+        on_error: Optional[Callable[[Path, Exception], None]] = None,
     ):
         self._loader = image_loader
         self._extensions = supported_extensions or self.DEFAULT_EXTENSIONS

@@ -24,4 +24,4 @@ class Image:
             raise ValueError(f"Coordenadas fuera de rango: ({x}, {y})")
 
         idx = (y * self.width + x) * self.channels
-        return tuple(self.data[idx:idx + self.channels])
+        return tuple(self.data[idx : idx + self.channels])
