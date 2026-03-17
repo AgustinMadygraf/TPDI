@@ -4,10 +4,8 @@ Path: src/infrastructure/cli/app.py
 
 from pathlib import Path
 from typing import List, Tuple
-
-from src.infrastructure.settings.logger import setup_logging, get_logger
+from src.infrastructure.shared.logger import setup_logging, get_logger
 from src.interface_adapters.controllers.main_controller import MainController
-from src.interface_adapters.gateways.image_gateway import ImageGateway
 from src.use_cases.load_images import ImageLoaderPort, LoadImagesFromDirectory
 from src.use_cases.display_image import ImageDisplayPort
 from src.use_cases.image_processing import (
@@ -23,8 +21,7 @@ from src.entities.image import Image
 
 
 class CLIApp:
-    """Aplicación de línea de comandos para TPDI."""
-
+    "Aplicación de línea de comandos para TPDI."
     def __init__(
         self,
         loader: ImageLoaderPort,
@@ -38,20 +35,16 @@ class CLIApp:
         self._base_path = base_path or MainController.DEFAULT_INPUT_DIR
 
     def _on_load_error(self, path: Path, exc: Exception) -> None:
-        """Callback para manejar errores de carga de imágenes."""
+        "Callback para manejar errores de carga de imágenes."
         self._logger.warning("No se pudo cargar imagen %s: %s", path, exc)
 
     def load_images(self) -> List[Image]:
-        """Carga todas las imágenes del directorio base."""
+        "Carga todas las imágenes del directorio base."
         use_case = LoadImagesFromDirectory(self._loader, on_error=self._on_load_error)
         return use_case.execute(self._base_path)
 
     def run_color_channel_analysis(self) -> bool:
-        """Ejecuta análisis de canales de color en grid 2x4.
-        
-        Returns:
-            True si se ejecutó correctamente, False si no hay imágenes.
-        """
+        "Ejecuta análisis de canales de color en grid 2x4."
         print("=" * 60)
         print("TPDI - Analisis de Canales de Color")
         print("=" * 60)
@@ -91,16 +84,7 @@ class CLIApp:
         return True
 
     def _analyze_pixel(self, image: Image, x: int, y: int) -> tuple:
-        """Obtiene el valor RGB de un pixel específico.
-        
-        Args:
-            image: Imagen a analizar.
-            x: Coordenada X.
-            y: Coordenada Y.
-            
-        Returns:
-            Tupla (R, G, B) o (G,) si es grayscale.
-        """
+        "Analiza el valor RGB de un pixel específico en la imagen."
         idx = (y * image.width + x) * image.channels
         if image.channels == 3:
             return (image.data[idx], image.data[idx+1], image.data[idx+2])
@@ -108,14 +92,7 @@ class CLIApp:
             return (image.data[idx],)
 
     def _process_color_variants(self, original: Image) -> List[Tuple[str, Image]]:
-        """Procesa las variantes de canales de color RGB.
-        
-        Args:
-            original: Imagen original.
-            
-        Returns:
-            Lista de tuplas (nombre_descriptivo, imagen_procesada).
-        """
+        "Procesa la imagen original para extraer canales y aplicar escala de grises, con depuración."
         print()
         print("=" * 60)
         print("DEPURACION DE CANALES RGB")

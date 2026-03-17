@@ -1,5 +1,5 @@
 """
-Path: src/infrastructure/settings/logger.py
+Path: src/infrastructure/shared/logger.py
 """
 import logging
 import sys

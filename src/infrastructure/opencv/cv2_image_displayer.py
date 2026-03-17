@@ -3,10 +3,9 @@ Path: src/infrastructure/opencv/cv2_image_displayer.py
 """
 
 from typing import List, Tuple
-
 import cv2
 from src.infrastructure.numpy.image_adapter import NumPyImageAdapter
-from src.infrastructure.settings.logger import get_logger
+from src.infrastructure.shared.logger import get_logger
 from src.use_cases.display_image import ImageDisplayPort
 from src.entities.image import Image
 
@@ -20,6 +19,7 @@ class CV2ImageDisplayer(ImageDisplayPort):
         self._numpy_adapter = NumPyImageAdapter()
 
     def _prepare_for_display(self, data):
+        "Prepara los datos de la imagen para su visualización con OpenCV."
         if len(data.shape) == 2:
             data = cv2.cvtColor(data, cv2.COLOR_GRAY2BGR)
         elif len(data.shape) == 3 and data.shape[2] == 3:
@@ -71,13 +71,7 @@ class CV2ImageDisplayer(ImageDisplayPort):
         grid_size: Tuple[int, int] = (2, 2),
         title: str = "Grid"
     ) -> None:
-        """Muestra múltiples imágenes en una cuadrícula.
-
-        Args:
-            images: Lista de tuplas (imagen, etiqueta).
-            grid_size: Tupla (filas, columnas) para el grid.
-            title: Título de la ventana.
-        """
+        "Muestra un grid de imágenes con etiquetas usando OpenCV."
         rows, cols = grid_size
         label_height = 30
 
@@ -88,7 +82,7 @@ class CV2ImageDisplayer(ImageDisplayPort):
             display_data = self._prepare_for_display(data)
 
             # Crear etiqueta
-            height, width = display_data.shape[:2]
+            _height, width = display_data.shape[:2]
             label_img = self._numpy_adapter.zeros((label_height, width, 3))
             cv2.putText(label_img, label, (10, 20),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)

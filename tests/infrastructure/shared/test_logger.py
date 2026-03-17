@@ -1,16 +1,15 @@
 """
-Unit tests for logger module.
-Path: tests/infrastructure/settings/test_logger.py
+Path: tests/infrastructure/shared/test_logger.py
 """
 
 import logging
 import sys
 from io import StringIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from src.infrastructure.settings.logger import (
+from src.infrastructure.shared.logger import (
     FastAPIFormatter,
     get_logger,
     setup_logging,
@@ -18,16 +17,15 @@ from src.infrastructure.settings.logger import (
 
 
 class TestFastAPIFormatter:
-    """Test suite for FastAPIFormatter."""
-
+    "Test suite for FastAPIFormatter."
     @pytest.fixture
     def formatter(self):
-        """Provides a FastAPIFormatter instance."""
+        "Provides a FastAPIFormatter instance."
         return FastAPIFormatter()
 
     @pytest.fixture
     def sample_record(self):
-        """Provides a sample log record."""
+        "Provides a sample log record."
         record = logging.LogRecord(
             name="test",
             level=logging.INFO,
@@ -42,9 +40,9 @@ class TestFastAPIFormatter:
         return record
 
     def test_format_time_with_tenths(self, formatter, sample_record):
-        """Test that formatTime includes tenths of second."""
+        "Test that formatTime includes tenths of second."
         formatted_time = formatter.formatTime(sample_record)
-        
+
         # Should be in format HH:MM:SS,d (d = tenths)
         assert "," in formatted_time
         parts = formatted_time.split(",")
@@ -52,25 +50,25 @@ class TestFastAPIFormatter:
         assert len(parts[1]) == 1  # Single digit for tenths
 
     def test_format_includes_level(self, formatter, sample_record):
-        """Test that format includes log level."""
+        "Test that format includes log level."
         formatted = formatter.format(sample_record)
-        
+
         assert "INFO" in formatted
 
     def test_format_includes_name(self, formatter, sample_record):
-        """Test that format includes logger name."""
+        "Test that format includes logger name."
         formatted = formatter.format(sample_record)
         
         assert "test" in formatted
 
     def test_format_includes_message(self, formatter, sample_record):
-        """Test that format includes message."""
+        "Test that format includes message."
         formatted = formatter.format(sample_record)
         
         assert "Test message" in formatted
 
     def test_colors_for_different_levels(self, formatter):
-        """Test that different levels have different colors."""
+        "Test that different levels have different colors."
         levels = [
             (logging.DEBUG, "DEBUG"),
             (logging.INFO, "INFO"),
@@ -78,7 +76,7 @@ class TestFastAPIFormatter:
             (logging.ERROR, "ERROR"),
             (logging.CRITICAL, "CRITICAL"),
         ]
-        
+
         for level, level_name in levels:
             record = logging.LogRecord(
                 name="test", level=level, pathname="test.py",
@@ -86,66 +84,66 @@ class TestFastAPIFormatter:
             )
             record.created = 1700000000.0
             record.msecs = 0
-            
+
             formatted = formatter.format(record)
-            
+
             # Each level should have its color code
             assert level_name in formatted
 
     def test_color_codes_present(self, formatter, sample_record):
-        """Test that ANSI color codes are present."""
+        "Test that ANSI color codes are present."
         formatted = formatter.format(sample_record)
-        
+
         # Check for ANSI escape codes
         assert "\033[" in formatted
-
+    
     def test_reset_code_present(self, formatter, sample_record):
-        """Test that reset code is present."""
+        "Test that reset code is present."
         formatted = formatter.format(sample_record)
-        
+
         assert "\033[0m" in formatted
 
 
 class TestSetupLogging:
-    """Test suite for setup_logging function."""
+    "Test suite for setup_logging function."
 
     def test_setup_logging_returns_logger(self):
-        """Test that setup_logging returns a logger."""
+        "Test that setup_logging returns a logger."
         logger = setup_logging(name="test_setup")
-        
+
         assert isinstance(logger, logging.Logger)
         assert logger.name == "test_setup"
 
     def test_setup_logging_sets_level(self):
-        """Test that setup_logging sets the correct level."""
+        "Test that setup_logging sets the correct level."
         logger = setup_logging(name="test_level", level=logging.DEBUG)
-        
+
         assert logger.level == logging.DEBUG
 
     def test_setup_logging_adds_handler(self):
-        """Test that setup_logging adds a StreamHandler."""
+        "Test that setup_logging adds a StreamHandler."
         # Create a unique name to avoid conflicts
         import uuid
         unique_name = f"test_handler_{uuid.uuid4().hex[:8]}"
-        
+
         logger = setup_logging(name=unique_name)
-        
+
         assert len(logger.handlers) > 0
         assert isinstance(logger.handlers[0], logging.StreamHandler)
 
     def test_setup_logging_uses_fastapi_formatter_for_tty(self):
-        """Test that FastAPIFormatter is used for TTY."""
+        "Test that FastAPIFormatter is used for TTY."
         import uuid
         unique_name = f"test_formatter_{uuid.uuid4().hex[:8]}"
-        
+
         with patch.object(sys.stdout, 'isatty', return_value=True):
             logger = setup_logging(name=unique_name)
-            
+
             handler = logger.handlers[0]
             assert isinstance(handler.formatter, FastAPIFormatter)
 
     def test_setup_logging_uses_standard_formatter_for_non_tty(self):
-        """Test that standard formatter is used for non-TTY."""
+        "Test that standard formatter is used for non-TTY."
         import uuid
         unique_name = f"test_std_formatter_{uuid.uuid4().hex[:8]}"
         
