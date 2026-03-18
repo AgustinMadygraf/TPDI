@@ -11,7 +11,7 @@ from src.infrastructure.shared.path_validator import PathValidator
 
 def main() -> None:
     "Punto de entrada principal de la aplicación TPDI."
-    config = load_config()
+    config = load_config(color_mode="CMYK")
 
     # Crear dependencias
     path_validator = PathValidator(base_path=config.INPUT_DIR)

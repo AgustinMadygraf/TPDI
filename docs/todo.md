@@ -1,7 +1,7 @@
 # Backlog Técnico - TPDI
 
 > Fecha: 2026-03-17
-> Enfoque actual: preparar soporte configurable RGB y CMY sin romper Clean Architecture
+> Enfoque actual: consolidar soporte configurable RGB, CMY y CMYK sin romper Clean Architecture
 
 ---
 
@@ -27,13 +27,12 @@
 
 ## Objetivo Inmediato
 
-Permitir configurar desde `src/infrastructure/shared/config.py` si el análisis y la visualización de canales se realizan en modo `RGB` o `CMY`, con valor por defecto `RGB`.
+Permitir configurar desde `src/infrastructure/shared/config.py` si el análisis y la visualización de canales se realizan en modo `RGB`, `CMY` o `CMYK`, con valor por defecto `RGB`.
 
 Regla acordada:
 
 - Las imágenes se cargan desde archivo y se normalizan a RGB canónico.
-- Si el modo configurado es `CMY`, la aplicación convierte desde RGB a CMY para analizar y mostrar.
-- El soporte `CMYK` queda explícitamente fuera de este alcance.
+- Si el modo configurado es `CMY` o `CMYK`, la aplicación convierte desde RGB para analizar y mostrar.
 
 ---
 
@@ -68,7 +67,7 @@ Regla acordada:
 
 ## No Hacer en Esta Iteración
 
-- [x] No introducir todavía soporte `CMYK`
+- [x] No introducir `CMYK` dentro de la entidad `Image` (mantenerlo como política externa)
 - [x] No agregar todavía `color_mode` a la entidad `Image`
 - [x] No mover la responsabilidad de decodificación de archivos fuera de `CV2ImageLoader`
 - [x] No rediseñar la arquitectura completa si el caso de uso configurable resuelve RGB/CMY con bajo acoplamiento
@@ -83,3 +82,17 @@ Regla acordada:
 - [x] El análisis produce variantes correctas para `RGB` y para `CMY`
 - [x] La solución mantiene dependencias hacia adentro y no introduce OpenCV en entidades o use cases
 - [x] Los tests cubren el comportamiento configurable sin romper la suite existente
+
+---
+
+## Próximo Paso (CMYK)
+
+Decisión de arquitectura tomada en `docs/decisions/ADR-002-modelar-color-como-politica-externa-para-cmyk.md`.
+
+### Backlog de implementación CMYK
+
+- [x] Extender `ColorMode` en configuración para incluir `CMYK`
+- [x] Extender el caso de uso de análisis configurable para producir variantes CMYK
+- [x] Definir estrategia visual para canal K en grid y etiquetas
+- [x] Adaptar CLI para reportes y depuración de 4 canales sin romper RGB/CMY
+- [x] Agregar pruebas unitarias e integración para flujo CMYK

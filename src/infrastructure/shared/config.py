@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 
-ColorMode = Literal["RGB", "CMY"]
+ColorMode = Literal["RGB", "CMY", "CMYK"]
 
 
 @dataclass(frozen=True)

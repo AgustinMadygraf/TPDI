@@ -3,6 +3,7 @@ Path: src/infrastructure/cli/app.py
 """
 
 from pathlib import Path
+import math
 from typing import List
 
 from src.entities.image import Image
@@ -87,10 +88,7 @@ class CLIApp:
     def _analyze_pixel(self, image: Image, x: int, y: int) -> tuple:
         "Analiza el valor del pixel específico en la imagen."
         idx = (y * image.width + x) * image.channels
-        if image.channels == 3:
-            return (image.data[idx], image.data[idx + 1], image.data[idx + 2])
-        else:
-            return (image.data[idx],)
+        return tuple(image.data[idx : idx + image.channels])
 
     def _process_color_variants(self, original: Image) -> ColorAnalysisResult:
         "Construye el analisis configurable y muestra depuracion en consola."
@@ -127,12 +125,11 @@ class CLIApp:
             values = self._analyze_pixel(original, x, y)
             converted_values = self._convert_pixel_for_mode(values)
             labels = analysis.channel_pixel_labels
-            print(
-                f"  ({x:4d},{y:4d}) {desc:30s} -> "
-                f"{labels[0]}={converted_values[0]:3d}, "
-                f"{labels[1]}={converted_values[1]:3d}, "
-                f"{labels[2]}={converted_values[2]:3d}"
+            values_text = ", ".join(
+                f"{label}={value:3d}"
+                for label, value in zip(labels, converted_values, strict=False)
             )
+            print(f"  ({x:4d},{y:4d}) {desc:30s} -> {values_text}")
 
         print()
         print("ESTADISTICAS GLOBALES DE LA ORIGINAL:")
@@ -141,15 +138,11 @@ class CLIApp:
         channel_values = self._extract_channel_values_for_mode(original)
         channel_labels = analysis.channel_labels
 
-        print(
-            f"  {channel_labels[0]:15s} -> Min: {min(channel_values[0]):3d}, Max: {max(channel_values[0]):3d}, Promedio: {sum(channel_values[0])/len(channel_values[0]):6.2f}"
-        )
-        print(
-            f"  {channel_labels[1]:15s} -> Min: {min(channel_values[1]):3d}, Max: {max(channel_values[1]):3d}, Promedio: {sum(channel_values[1])/len(channel_values[1]):6.2f}"
-        )
-        print(
-            f"  {channel_labels[2]:15s} -> Min: {min(channel_values[2]):3d}, Max: {max(channel_values[2]):3d}, Promedio: {sum(channel_values[2])/len(channel_values[2]):6.2f}"
-        )
+        for label, values in zip(channel_labels, channel_values, strict=False):
+            print(
+                f"  {label:15s} -> Min: {min(values):3d}, Max: {max(values):3d}, "
+                f"Promedio: {sum(values)/len(values):6.2f}"
+            )
         print()
 
         print("EXTRAYENDO CANALES DE LA IMAGEN ORIGINAL...")
@@ -158,22 +151,35 @@ class CLIApp:
         print("VERIFICACION DE EXTRACCION:")
         print("-" * 60)
 
-        for variant in analysis.variants[:3]:
+        channel_variant_count = len(analysis.channel_labels)
+        for variant in analysis.variants[:channel_variant_count]:
             print(
                 self._build_channel_verification_message(
                     original, variant.label, variant.image
                 )
             )
 
-        grayscale_image = analysis.variants[3].image
-        original_values = self._convert_pixel_for_mode(tuple(original.data[:3]))
-        expected_gray = int(sum(original_values) / 3)
-        gray_values = tuple(grayscale_image.data[:3])
-        print(
-            f"  Escala Gris: Pixel 0 -> "
-            f"R={gray_values[0]:3d}, G={gray_values[1]:3d}, B={gray_values[2]:3d} | "
-            f"Esperado: {expected_gray:3d} | OK: {gray_values == (expected_gray, expected_gray, expected_gray)}"
+        grayscale_variant = next(
+            (
+                variant
+                for variant in analysis.variants
+                if variant.label == "ESCALA DE GRISES"
+            ),
+            None,
         )
+        if grayscale_variant is not None:
+            grayscale_image = grayscale_variant.image
+            original_values = self._convert_pixel_for_mode(tuple(original.data[:3]))
+            expected_gray = int(sum(original_values) / len(original_values))
+            if self._color_mode == "CMYK":
+                expected_gray = 255 - expected_gray
+            gray_values = tuple(grayscale_image.data[:3])
+            print(
+                f"  Escala Gris: Pixel 0 -> "
+                f"R={gray_values[0]:3d}, G={gray_values[1]:3d}, B={gray_values[2]:3d} | "
+                f"Esperado: {expected_gray:3d} | "
+                f"OK: {gray_values == (expected_gray, expected_gray, expected_gray)}"
+            )
 
         print()
         print("=" * 60)
@@ -181,45 +187,75 @@ class CLIApp:
         return analysis
 
     def _display_grid_2x4(self, original: Image, analysis: ColorAnalysisResult) -> None:
-        """Muestra el grid 2x4 con la imagen original y variantes del modo activo.
+        """Muestra un grid de analisis con tamaño dinamico segun variantes.
 
         Args:
             original: Imagen original.
             analysis: Resultado procesado para display.
         """
-        print("Mostrando grid de analisis 2x4:")
-        grid_labels = [variant.label for variant in analysis.variants]
-        print(
-            f"  [FILA 1] ORIGINAL | {grid_labels[0]} | {grid_labels[1]} | {grid_labels[2]}"
-        )
-        print(
-            f"  [FILA 2] {grid_labels[3]} | {grid_labels[4]} | "
-            f"{grid_labels[5]} | {grid_labels[6]}"
-        )
+        if analysis.mode == "CMYK":
+            print("Mostrando grid de analisis 2x3:")
+            rows, cols = (3, 2)
+            variant_by_label = {variant.label: variant for variant in analysis.variants}
+            ordered_labels = [
+                "ORIGINAL",
+                "ESCALA DE GRISES",
+                "CANAL CIAN",
+                "CANAL MAGENTA",
+                "CANAL AMARILLO",
+                "CANAL NEGRO",
+            ]
+
+            grid_images = [(original, "ORIGINAL")]
+            grid_images.extend(
+                (variant_by_label[label].image, label)
+                for label in ordered_labels[1:]
+                if label in variant_by_label
+            )
+
+            for row in range(rows):
+                start = row * cols
+                end = start + cols
+                row_items = ordered_labels[start:end]
+                print(f"  [FILA {row + 1}] " + " | ".join(row_items))
+        else:
+            print("Mostrando grid de analisis 2x4:")
+            grid_labels = [variant.label for variant in analysis.variants]
+            total_images = 1 + len(grid_labels)
+            cols = 4
+            rows = max(2, math.ceil(total_images / cols))
+
+            for row in range(rows):
+                start = row * cols
+                end = start + cols
+                if row == 0:
+                    row_items = ["ORIGINAL", *grid_labels[: cols - 1]]
+                else:
+                    row_items = grid_labels[start - 1 : end - 1]
+                if row_items:
+                    print(f"  [FILA {row + 1}] " + " | ".join(row_items))
+
+            grid_images = [
+                (original, "ORIGINAL"),
+                *[(variant.image, variant.label) for variant in analysis.variants],
+            ]
         print()
         print("Presiona cualquier tecla en la ventana para cerrar...")
         print()
 
-        grid_images = [
-            (original, "ORIGINAL"),
-            *[(variant.image, variant.label) for variant in analysis.variants],
-        ]
-
         self._displayer.display_grid(
-            images=grid_images, grid_size=(2, 4), title=analysis.analysis_title
+            images=grid_images, grid_size=(rows, cols), title=analysis.analysis_title
         )
 
-    def _convert_pixel_for_mode(
-        self, values: tuple[int, int, int]
-    ) -> tuple[int, int, int]:
+    def _convert_pixel_for_mode(self, values: tuple[int, ...]) -> tuple[int, ...]:
         """Convierte un pixel RGB al modo de color activo para depuracion."""
         if self._color_mode == "CMY":
             return tuple(255 - value for value in values)
+        if self._color_mode == "CMYK":
+            return self._rgb_to_cmyk(values[0], values[1], values[2])
         return values
 
-    def _extract_channel_values_for_mode(
-        self, image: Image
-    ) -> tuple[List[int], List[int], List[int]]:
+    def _extract_channel_values_for_mode(self, image: Image) -> tuple[List[int], ...]:
         """Retorna los valores por canal segun el modo de color activo."""
         first_channel = [image.data[i] for i in range(0, len(image.data), 3)]
         second_channel = [image.data[i + 1] for i in range(0, len(image.data), 3)]
@@ -232,6 +268,21 @@ class CLIApp:
                 [255 - value for value in third_channel],
             )
 
+        if self._color_mode == "CMYK":
+            cyan_values: List[int] = []
+            magenta_values: List[int] = []
+            yellow_values: List[int] = []
+            black_values: List[int] = []
+            for red, green, blue in zip(
+                first_channel, second_channel, third_channel, strict=False
+            ):
+                cyan, magenta, yellow, black = self._rgb_to_cmyk(red, green, blue)
+                cyan_values.append(cyan)
+                magenta_values.append(magenta)
+                yellow_values.append(yellow)
+                black_values.append(black)
+            return (cyan_values, magenta_values, yellow_values, black_values)
+
         return (first_channel, second_channel, third_channel)
 
     def _build_channel_verification_message(
@@ -241,18 +292,62 @@ class CLIApp:
         source_values = self._convert_pixel_for_mode(tuple(original.data[:3]))
         variant_values = tuple(variant.data[:3])
 
-        expected_by_label = {
-            "CANAL ROJO": (source_values[0], 0, 0),
-            "CANAL VERDE": (0, source_values[1], 0),
-            "CANAL AZUL": (0, 0, source_values[2]),
-            "CANAL CIAN": (0, source_values[0], source_values[0]),
-            "CANAL MAGENTA": (source_values[1], 0, source_values[1]),
-            "CANAL AMARILLO": (source_values[2], source_values[2], 0),
-        }
-        expected = expected_by_label[label]
+        is_cmyk_mode = self._color_mode == "CMYK" and len(source_values) >= 4
+
+        if label == "CANAL ROJO":
+            expected = (source_values[0], 0, 0)
+        elif label == "CANAL VERDE":
+            expected = (0, source_values[1], 0)
+        elif label == "CANAL AZUL":
+            expected = (0, 0, source_values[2])
+        elif label == "CANAL CIAN":
+            expected = (
+                (255 - source_values[0], 255, 255)
+                if is_cmyk_mode
+                else (0, source_values[0], source_values[0])
+            )
+        elif label == "CANAL MAGENTA":
+            expected = (
+                (255, 255 - source_values[1], 255)
+                if is_cmyk_mode
+                else (source_values[1], 0, source_values[1])
+            )
+        elif label == "CANAL AMARILLO":
+            expected = (
+                (255, 255, 255 - source_values[2])
+                if is_cmyk_mode
+                else (source_values[2], source_values[2], 0)
+            )
+        elif label == "CANAL NEGRO" and len(source_values) >= 4:
+            value = 255 - source_values[3]
+            expected = (value, value, value)
+        else:
+            expected = variant_values
+
         return (
             f"  {label}: Pixel 0 -> R={variant_values[0]:3d}, G={variant_values[1]:3d}, "
             f"B={variant_values[2]:3d} | Esperado: {expected} | OK: {variant_values == expected}"
+        )
+
+    def _rgb_to_cmyk(self, red: int, green: int, blue: int) -> tuple[int, int, int, int]:
+        """Convierte un pixel RGB a CMYK en rango 0..255."""
+        red_norm = red / 255.0
+        green_norm = green / 255.0
+        blue_norm = blue / 255.0
+
+        key = 1.0 - max(red_norm, green_norm, blue_norm)
+        if key >= 1.0:
+            return (0, 0, 0, 255)
+
+        cyan = (1.0 - red_norm - key) / (1.0 - key)
+        magenta = (1.0 - green_norm - key) / (1.0 - key)
+        yellow = (1.0 - blue_norm - key) / (1.0 - key)
+
+        return (
+            int(round(cyan * 255)),
+            int(round(magenta * 255)),
+            int(round(yellow * 255)),
+            int(round(key * 255)),
         )
 
     def run(self) -> None:

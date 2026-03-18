@@ -3,6 +3,8 @@ Unit tests for CLIApp.
 Path: tests/infrastructure/cli/test_app.py
 """
 
+# pylint: disable=protected-access
+
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -11,6 +13,42 @@ import pytest
 from src.entities.image import Image
 from src.infrastructure.cli.app import CLIApp
 from src.use_cases.color_analysis import ColorAnalysisResult, ColorAnalysisVariant
+
+
+class TestableCLIApp(CLIApp):
+    """Expose internals through public wrappers for testing purposes."""
+
+    @property
+    def logger(self):
+        return self._logger
+
+    @property
+    def displayer(self):
+        return self._displayer
+
+    @property
+    def loader(self):
+        return self._loader
+
+    @property
+    def color_mode(self):
+        return self._color_mode
+
+    @property
+    def base_path(self):
+        return self._base_path
+
+    def on_load_error(self, path: Path, exc: Exception) -> None:
+        self._on_load_error(path, exc)
+
+    def process_color_variants(self, original: Image) -> ColorAnalysisResult:
+        return self._process_color_variants(original)
+
+    def display_grid_analysis(self, original: Image, analysis: ColorAnalysisResult) -> None:
+        self._display_grid_2x4(original, analysis)
+
+    def display_image_public(self, image: Image) -> None:
+        self._display_image(image)
 
 
 class TestCLIApp:
@@ -34,8 +72,7 @@ class TestCLIApp:
                 mock_logger = MagicMock()
                 mock_get_logger.return_value = mock_logger
                 
-                app = CLIApp(loader=mock_loader, displayer=mock_displayer)
-                app._logger = mock_logger
+                app = TestableCLIApp(loader=mock_loader, displayer=mock_displayer)
                 return app
 
     def test_initialization(self, mock_loader, mock_displayer):
@@ -45,11 +82,11 @@ class TestCLIApp:
                 mock_logger = MagicMock()
                 mock_get_logger.return_value = mock_logger
                 
-                app = CLIApp(loader=mock_loader, displayer=mock_displayer)
+                app = TestableCLIApp(loader=mock_loader, displayer=mock_displayer)
                 
-                assert app._displayer == mock_displayer
-                assert app._loader == mock_loader
-                assert app._color_mode == "RGB"
+                assert app.displayer == mock_displayer
+                assert app.loader == mock_loader
+                assert app.color_mode == "RGB"
 
     def test_initialization_accepts_color_mode(self, mock_loader, mock_displayer):
         """Test CLIApp allows overriding the color mode."""
@@ -58,22 +95,22 @@ class TestCLIApp:
                 mock_logger = MagicMock()
                 mock_get_logger.return_value = mock_logger
 
-                app = CLIApp(
+                app = TestableCLIApp(
                     loader=mock_loader,
                     displayer=mock_displayer,
                     color_mode="CMY",
                 )
 
-                assert app._color_mode == "CMY"
+                assert app.color_mode == "CMY"
 
     def test_on_load_error_logs_warning(self, app):
         """Test that load error logs warning."""
         test_path = Path("/tmp/test.png")
         test_error = ValueError("Test error")
         
-        app._on_load_error(test_path, test_error)
+        app.on_load_error(test_path, test_error)
         
-        app._logger.warning.assert_called_once_with(
+        app.logger.warning.assert_called_once_with(
             "No se pudo cargar imagen %s: %s", test_path, test_error
         )
 
@@ -115,8 +152,7 @@ class TestCLIAppColorChannelAnalysis:
                 mock_logger = MagicMock()
                 mock_get_logger.return_value = mock_logger
                 
-                app = CLIApp(loader=mock_loader, displayer=mock_displayer)
-                app._logger = mock_logger
+                app = TestableCLIApp(loader=mock_loader, displayer=mock_displayer)
                 return app
 
     @pytest.fixture
@@ -172,7 +208,7 @@ class TestCLIAppColorChannelAnalysis:
 
     def test_process_color_variants(self, app, sample_image):
         """Test _process_color_variants creates correct variants."""
-        analysis = app._process_color_variants(sample_image)
+        analysis = app.process_color_variants(sample_image)
 
         assert analysis.mode == "RGB"
         assert len(analysis.variants) == 7
@@ -196,20 +232,80 @@ class TestCLIAppColorChannelAnalysis:
                 mock_logger = MagicMock()
                 mock_get_logger.return_value = mock_logger
 
-                app = CLIApp(
+                app = TestableCLIApp(
                     loader=mock_loader,
                     displayer=mock_displayer,
                     color_mode="CMY",
                 )
-                app._logger = mock_logger
 
-        analysis = app._process_color_variants(sample_image)
+        analysis = app.process_color_variants(sample_image)
 
         assert analysis.mode == "CMY"
         names = [variant.label for variant in analysis.variants]
         assert "CANAL CIAN" in names
         assert "CANAL MAGENTA" in names
         assert "CANAL AMARILLO" in names
+
+    def test_process_color_variants_cmyk(self, mock_loader, mock_displayer, sample_image):
+        """Test _process_color_variants creates CMYK variants when configured."""
+        with patch('src.infrastructure.cli.app.setup_logging'):
+            with patch('src.infrastructure.cli.app.get_logger') as mock_get_logger:
+                mock_logger = MagicMock()
+                mock_get_logger.return_value = mock_logger
+
+                app = TestableCLIApp(
+                    loader=mock_loader,
+                    displayer=mock_displayer,
+                    color_mode="CMYK",
+                )
+
+        analysis = app.process_color_variants(sample_image)
+
+        assert analysis.mode == "CMYK"
+        names = [variant.label for variant in analysis.variants]
+        assert "CANAL CIAN" in names
+        assert "CANAL MAGENTA" in names
+        assert "CANAL AMARILLO" in names
+        assert "CANAL NEGRO" in names
+        assert "ESCALA DE GRISES" in names
+        assert len(analysis.variants) == 5
+
+    def test_display_grid_cmyk_uses_2x3_with_six_images(self, app, sample_image):
+        """CMYK analysis should show 2x3 with Original, Gray, C, M, Y, K."""
+        analysis = ColorAnalysisResult(
+            mode="CMYK",
+            debug_title="DEPURACION DE CANALES CMYK",
+            channel_labels=(
+                "Canal Cian",
+                "Canal Magenta",
+                "Canal Amarillo",
+                "Canal Negro",
+            ),
+            channel_pixel_labels=("Cian", "Magenta", "Amarillo", "Negro"),
+            analysis_title="Analisis CMYK: test.png",
+            variants=[
+                ColorAnalysisVariant("CANAL CIAN", Mock()),
+                ColorAnalysisVariant("CANAL MAGENTA", Mock()),
+                ColorAnalysisVariant("CANAL AMARILLO", Mock()),
+                ColorAnalysisVariant("CANAL NEGRO", Mock()),
+                ColorAnalysisVariant("ESCALA DE GRISES", Mock()),
+            ],
+        )
+
+        app.display_grid_analysis(sample_image, analysis)
+
+        call_args = app.displayer.display_grid.call_args
+        assert call_args[1]['grid_size'] == (3, 2)
+        assert len(call_args[1]['images']) == 6
+        labels = [label for _, label in call_args[1]['images']]
+        assert labels == [
+            "ORIGINAL",
+            "ESCALA DE GRISES",
+            "CANAL CIAN",
+            "CANAL MAGENTA",
+            "CANAL AMARILLO",
+            "CANAL NEGRO",
+        ]
 
     def test_display_grid_2x4(self, app, sample_image):
         """Test _display_grid_2x4 calls displayer correctly."""
@@ -230,11 +326,11 @@ class TestCLIAppColorChannelAnalysis:
             ],
         )
 
-        app._display_grid_2x4(sample_image, analysis)
+        app.display_grid_analysis(sample_image, analysis)
         
         # Should call display_grid with 8 images
-        app._displayer.display_grid.assert_called_once()
-        call_args = app._displayer.display_grid.call_args
+        app.displayer.display_grid.assert_called_once()
+        call_args = app.displayer.display_grid.call_args
         
         # Check grid_size is 2x4
         assert call_args[1]['grid_size'] == (2, 4)
@@ -266,8 +362,7 @@ class TestCLIAppStandardRun:
                 mock_logger = MagicMock()
                 mock_get_logger.return_value = mock_logger
                 
-                app = CLIApp(loader=mock_loader, displayer=mock_displayer)
-                app._logger = mock_logger
+                app = TestableCLIApp(loader=mock_loader, displayer=mock_displayer)
                 return app
 
     @pytest.fixture
@@ -299,14 +394,14 @@ class TestCLIAppStandardRun:
             
             app.run()
             
-            app._logger.warning.assert_called_with(
+            app.logger.warning.assert_called_with(
                 "No se encontraron imagenes en: %s", 
-                app._base_path
+                app.base_path
             )
 
     def test_display_image(self, app, mock_displayer, sample_image):
         """Test _display_image method."""
-        app._display_image(sample_image)
+        app.display_image_public(sample_image)
         
         mock_displayer.display.assert_called_once_with(sample_image)
-        app._logger.info.assert_any_call("Mostrando imagen: %s", "test.png")
+        app.logger.info.assert_any_call("Mostrando imagen: %s", "test.png")

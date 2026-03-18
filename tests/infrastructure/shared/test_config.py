@@ -20,6 +20,12 @@ class TestAppConfig:
 
         assert config.COLOR_MODE == "CMY"
 
+    def test_load_config_accepts_cmyk_color_mode(self):
+        """Configuration should allow selecting CMYK mode."""
+        config = load_config(color_mode="CMYK")
+
+        assert config.COLOR_MODE == "CMYK"
+
     def test_load_config_converts_input_dir_to_path(self):
         """Input directory should still be normalized to Path."""
         config = load_config(input_dir="data/input")
