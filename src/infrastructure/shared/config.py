@@ -2,9 +2,10 @@
 Path: src/infrastructure/shared/config.py
 """
 
+import argparse
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import Callable, ClassVar
 
 from src.use_cases.display_image import ImageDisplayPort
 from src.use_cases.color_separation import (
@@ -12,45 +13,75 @@ from src.use_cases.color_separation import (
     default_flexo_spot_palettes,
 )
 
+@dataclass(frozen=True)
+class AppConfigDefaults:
+    gui_backend: str = "cv2"
+    color_mode: str = "CMYK"
+    cmyk_dot_gain: float = 0.0
+    cmyk_total_ink_limit: int = 1020
+    flexo_active_palette: str = "CYAN_MAGENTA"
+    input_dir: Path = Path("data/input")
+    log_level: str = "INFO"
+    flexo_spot_palettes_factory: Callable[
+        [], dict[str, FlexoSpotPalette]
+    ] = default_flexo_spot_palettes
 
-ColorMode = Literal["RGB", "CMY", "CMYK"]
+
+APP_CONFIG_DEFAULTS = AppConfigDefaults()
+
+
 DisplayerRegistry = dict[str, type[ImageDisplayPort]]
+MODE_CHOICES: tuple[str, str, str] = ("RGB", "CMY", "CMYK")
 
+def parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="TPDI - Analisis de canales de color")
+    parser.add_argument(
+        "--mode",
+        choices=list(MODE_CHOICES),
+        help="Modo de color para el analisis (si se omite usa el default de config)",
+    )
+    return parser.parse_args(argv)
 
 @dataclass(frozen=True)
 class AppConfig:
     _displayers: ClassVar[dict[str, type[ImageDisplayPort]]] = {}
 
-    GUI_BACKEND: str = "cv2"
-    COLOR_MODE: ColorMode = "RGB"
-    CMYK_DOT_GAIN: float = 0.0
-    CMYK_TOTAL_INK_LIMIT: int = 1020
-    FLEXO_ACTIVE_PALETTE: str = "CYAN_MAGENTA"
-    FLEXO_SPOT_PALETTES: dict[str, FlexoSpotPalette] = field(
-        default_factory=default_flexo_spot_palettes
+    gui_backend: str = APP_CONFIG_DEFAULTS.gui_backend
+    color_mode: str = APP_CONFIG_DEFAULTS.color_mode
+    cmyk_dot_gain: float = APP_CONFIG_DEFAULTS.cmyk_dot_gain
+    cmyk_total_ink_limit: int = APP_CONFIG_DEFAULTS.cmyk_total_ink_limit
+    flexo_active_palette: str = APP_CONFIG_DEFAULTS.flexo_active_palette
+    flexo_spot_palettes: dict[str, FlexoSpotPalette] = field(
+        default_factory=APP_CONFIG_DEFAULTS.flexo_spot_palettes_factory
     )
-    INPUT_DIR: Path = field(default_factory=lambda: Path("data/input"))
-    LOG_LEVEL: str = "INFO"
+    input_dir: Path = APP_CONFIG_DEFAULTS.input_dir
+    log_level: str = APP_CONFIG_DEFAULTS.log_level
 
     def __post_init__(self):
-        # Validar que INPUT_DIR sea un Path válido
-        if isinstance(self.INPUT_DIR, str):
-            object.__setattr__(self, "INPUT_DIR", Path(self.INPUT_DIR))
+        # Validar que input_dir sea un Path valido.
+        if isinstance(self.input_dir, str):
+            object.__setattr__(self, "input_dir", Path(self.input_dir))
 
-        if not (0.0 <= self.CMYK_DOT_GAIN <= 1.0):
-            raise ValueError("CMYK_DOT_GAIN debe estar entre 0.0 y 1.0")
-
-        if not (0 < self.CMYK_TOTAL_INK_LIMIT <= 1020):
+        # Permite recibir strings (CLI/tests) y normaliza a enum tipado.
+        if self.color_mode not in MODE_CHOICES:
+            valid_modes = ", ".join(MODE_CHOICES)
             raise ValueError(
-                "CMYK_TOTAL_INK_LIMIT debe estar entre 1 y 1020"
+                f"color_mode invalido: '{self.color_mode}'. "
+                f"Valores permitidos: {valid_modes}"
             )
 
-        if not self.FLEXO_SPOT_PALETTES:
-            raise ValueError("FLEXO_SPOT_PALETTES no puede estar vacio")
+        if not (0.0 <= self.cmyk_dot_gain <= 1.0):
+            raise ValueError("cmyk_dot_gain debe estar entre 0.0 y 1.0")
 
-        if self.FLEXO_ACTIVE_PALETTE not in self.FLEXO_SPOT_PALETTES:
+        if not (0 < self.cmyk_total_ink_limit <= 1020):
+            raise ValueError("cmyk_total_ink_limit debe estar entre 1 y 1020")
+
+        if not self.flexo_spot_palettes:
+            raise ValueError("flexo_spot_palettes no puede estar vacio")
+
+        if self.flexo_active_palette not in self.flexo_spot_palettes:
             raise ValueError(
-                "FLEXO_ACTIVE_PALETTE debe existir en FLEXO_SPOT_PALETTES"
+                "flexo_active_palette debe existir en flexo_spot_palettes"
             )
 
     @classmethod
@@ -79,7 +110,7 @@ class AppConfig:
         return list(cls._displayers.keys())
 
     def create_displayer(self) -> ImageDisplayPort:
-        backend = self.GUI_BACKEND
+        backend = self.gui_backend
 
         if backend not in self._displayers:
             # Lazy loading de displayers built-in.
@@ -103,38 +134,40 @@ class AppConfig:
         displayer_class = self._displayers[backend]
         return displayer_class()
 
+    @classmethod
+    def from_overrides(
+        cls,
+        gui_backend: str = None,
+        color_mode: str = None,
+        cmyk_dot_gain: float = None,
+        cmyk_total_ink_limit: int = None,
+        flexo_active_palette: str = None,
+        flexo_spot_palettes: dict[str, FlexoSpotPalette] = None,
+        gui_displayers: DisplayerRegistry = None,
+        input_dir: str | Path = None,
+        log_level: str = None,
+    ) -> "AppConfig":
+        kwargs = {}
+        if gui_backend is not None:
+            kwargs["gui_backend"] = gui_backend
+        if color_mode is not None:
+            kwargs["color_mode"] = color_mode
+        if cmyk_dot_gain is not None:
+            kwargs["cmyk_dot_gain"] = cmyk_dot_gain
+        if cmyk_total_ink_limit is not None:
+            kwargs["cmyk_total_ink_limit"] = cmyk_total_ink_limit
+        if flexo_active_palette is not None:
+            kwargs["flexo_active_palette"] = flexo_active_palette
+        if flexo_spot_palettes is not None:
+            kwargs["flexo_spot_palettes"] = flexo_spot_palettes
+        if input_dir is not None:
+            kwargs["input_dir"] = input_dir
+        if log_level is not None:
+            kwargs["log_level"] = log_level
 
-def load_config(
-    gui_backend: str = None,
-    color_mode: ColorMode = None,
-    cmyk_dot_gain: float = None,
-    cmyk_total_ink_limit: int = None,
-    flexo_active_palette: str = None,
-    flexo_spot_palettes: dict[str, FlexoSpotPalette] = None,
-    gui_displayers: DisplayerRegistry = None,
-    input_dir: str | Path = None,
-    log_level: str = None,
-) -> AppConfig:
-    kwargs = {}
-    if gui_backend is not None:
-        kwargs["GUI_BACKEND"] = gui_backend
-    if color_mode is not None:
-        kwargs["COLOR_MODE"] = color_mode
-    if cmyk_dot_gain is not None:
-        kwargs["CMYK_DOT_GAIN"] = cmyk_dot_gain
-    if cmyk_total_ink_limit is not None:
-        kwargs["CMYK_TOTAL_INK_LIMIT"] = cmyk_total_ink_limit
-    if flexo_active_palette is not None:
-        kwargs["FLEXO_ACTIVE_PALETTE"] = flexo_active_palette
-    if flexo_spot_palettes is not None:
-        kwargs["FLEXO_SPOT_PALETTES"] = flexo_spot_palettes
-    if input_dir is not None:
-        kwargs["INPUT_DIR"] = input_dir
-    if log_level is not None:
-        kwargs["LOG_LEVEL"] = log_level
+        config = cls(**kwargs)
+        if gui_displayers:
+            cls.register_displayers(gui_displayers)
 
-    config = AppConfig(**kwargs)
-    if gui_displayers:
-        AppConfig.register_displayers(gui_displayers)
+        return config
 
-    return config
