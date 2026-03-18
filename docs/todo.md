@@ -102,7 +102,7 @@ Decisiones de arquitectura tomadas en:
 
 ### Backlog de evolucion a flexo 2 colores plenos
 
-- [ ] Definir modelo de tinta plana (spot) y configuracion de paletas
+- [x] Definir modelo de tinta plana (spot) y configuracion de paletas
 - [ ] Implementar primera estrategia de reduccion a 2 canales de impresion
 - [ ] Agregar validaciones de cobertura total por proceso flexografico
 - [ ] Incorporar pruebas de regresion para escenarios 2 plenos
