@@ -7,6 +7,7 @@ import math
 from typing import List
 
 from src.entities.image import Image
+from src.infrastructure.opencv.cv2_video_loader import CameraUnavailableError
 from src.infrastructure.shared.logger import setup_logging, get_logger
 from src.use_cases.color_analysis import (
     ColorAnalysisResult,
@@ -18,10 +19,9 @@ from src.interface_adapters.controllers.main_controller import MainController
 from src.use_cases.display_image import ImageDisplayPort
 from src.use_cases.load_images import ImageLoaderPort, LoadImagesFromDirectory
 
-
-
 from src.interface_adapters.gateways.image_gateway import ImageGateway
 from src.infrastructure.shared.config import AppConfig
+
 
 class CLIApp:
     "Aplicación de línea de comandos para TPDI."
@@ -65,12 +65,26 @@ class CLIApp:
         print()
 
         if self._config.image_source == "camera":
-            print("Capturando imagen desde cámara...")
-            stream = self._gateway.get_video_stream(frame_interval=0.1)
+            frame_interval = 1.0 / self._config.fps
+            print(
+                "Capturando imagen desde camara... "
+                f"(indice: {self._config.camera_index}, "
+                f"fps: {self._config.fps:.2f}, "
+                f"intervalo: {frame_interval:.3f}s)"
+            )
             try:
+                stream = self._gateway.get_video_stream(
+                    frame_interval=frame_interval
+                )
                 original = next(stream)
+            except CameraUnavailableError as exc:
+                self._print_camera_unavailable_help(exc)
+                return False
+            except RuntimeError as exc:
+                self._print_camera_unavailable_help(exc)
+                return False
             except StopIteration:
-                print("ERROR: No se pudo capturar imagen de la cámara.")
+                print("ERROR: No se pudo capturar imagen de la camara.")
                 return False
             print(f"Imagen capturada: {original.name}")
             print(f"  Dimensiones: {original.width}x{original.height}")
@@ -103,6 +117,17 @@ class CLIApp:
         print("Aplicacion finalizada.")
         print("=" * 60)
         return True
+
+    def _print_camera_unavailable_help(self, exc: Exception) -> None:
+        "Muestra un error de camara con pasos concretos para recuperarse."
+        self._logger.error("Error de camara: %s", exc)
+        print("ERROR: No se pudo iniciar la camara.")
+        print(f"Detalle: {exc}")
+        print("Sugerencias:")
+        print("  1. Verifica que la camara este conectada y libre.")
+        print("  2. Prueba otro indice: --image_source=camera --camera_index=1")
+        print("  3. Usa archivos: --image_source=file --input_dir=data/input")
+        print()
 
     def _analyze_pixel(self, image: Image, x: int, y: int) -> tuple:
         "Analiza el valor del pixel específico en la imagen."

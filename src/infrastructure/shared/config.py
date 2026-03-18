@@ -6,11 +6,18 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
+
 from src.use_cases.display_image import ImageDisplayPort
 
 COLOR_MODE_CHOICES: tuple[str, str, str] = ("RGB", "CMY", "CMYK")
 GUI_BACKEND_CHOICES: tuple[str, str] = ("cv2", "matplotlib")
-LOG_LEVEL_CHOICES: tuple[str, str, str, str, str] = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+LOG_LEVEL_CHOICES: tuple[str, str, str, str, str] = (
+    "DEBUG",
+    "INFO",
+    "WARNING",
+    "ERROR",
+    "CRITICAL",
+)
 IMAGE_SOURCE_CHOICES: tuple[str, str] = ("file", "camera")
 
 @dataclass(frozen=True)
@@ -19,7 +26,9 @@ class AppConfigDefaults:
     color_mode: str = COLOR_MODE_CHOICES[2]  # "CMYK"
     input_dir: Path = Path("data/input")
     log_level: str = LOG_LEVEL_CHOICES[0]  # "DEBUG"
-    image_source: str = IMAGE_SOURCE_CHOICES[1]  # "camera"
+    image_source: str = IMAGE_SOURCE_CHOICES[0]  # "file"
+    camera_index: int = 0
+    fps: float = 10.0
 
 APP_CONFIG_DEFAULTS = AppConfigDefaults()
 
@@ -50,7 +59,26 @@ def parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--image_source",
         choices=list(IMAGE_SOURCE_CHOICES),
-        help="Fuente de imagen: 'file' o 'camera' (por defecto: file)",
+        help=(
+            "Fuente de imagen: 'file' o 'camera' "
+            f"(por defecto: {APP_CONFIG_DEFAULTS.image_source})"
+        ),
+    )
+    parser.add_argument(
+        "--camera_index",
+        type=int,
+        help=(
+            "Indice de camara para OpenCV (solo aplica a --image_source=camera, "
+            f"por defecto: {APP_CONFIG_DEFAULTS.camera_index})"
+        ),
+    )
+    parser.add_argument(
+        "--fps",
+        type=float,
+        help=(
+            "Frames por segundo para captura de camara "
+            f"(por defecto: {APP_CONFIG_DEFAULTS.fps})"
+        ),
     )
     return parser.parse_args(argv)
 
@@ -64,6 +92,8 @@ class AppConfig:
     input_dir: Path = APP_CONFIG_DEFAULTS.input_dir
     log_level: str = APP_CONFIG_DEFAULTS.log_level
     image_source: str = APP_CONFIG_DEFAULTS.image_source
+    camera_index: int = APP_CONFIG_DEFAULTS.camera_index
+    fps: float = APP_CONFIG_DEFAULTS.fps
 
     def __post_init__(self):
         # Validar que input_dir sea un Path valido.
@@ -83,6 +113,17 @@ class AppConfig:
                 f"image_source invalido: '{self.image_source}'. "
                 f"Valores permitidos: {valid_sources}"
             )
+        if not isinstance(self.camera_index, int):
+            raise ValueError("camera_index invalido: debe ser un entero.")
+        if self.camera_index < 0:
+            raise ValueError("camera_index invalido: debe ser >= 0.")
+        if isinstance(self.fps, bool) or not isinstance(
+            self.fps, (int, float)
+        ):
+            raise ValueError("fps invalido: debe ser un numero.")
+        if self.fps <= 0:
+            raise ValueError("fps invalido: debe ser > 0.")
+        object.__setattr__(self, "fps", float(self.fps))
 
     @classmethod
     def register_displayer(
@@ -136,6 +177,9 @@ class AppConfig:
         gui_displayers: DisplayerRegistry = None,
         input_dir: str | Path = None,
         log_level: str = None,
+        image_source: str = None,
+        camera_index: int = None,
+        fps: float = None,
     ) -> "AppConfig":
         kwargs = {}
         if gui_backend is not None:
@@ -146,6 +190,12 @@ class AppConfig:
             kwargs["input_dir"] = input_dir
         if log_level is not None:
             kwargs["log_level"] = log_level
+        if image_source is not None:
+            kwargs["image_source"] = image_source
+        if camera_index is not None:
+            kwargs["camera_index"] = camera_index
+        if fps is not None:
+            kwargs["fps"] = fps
 
         config = cls(**kwargs)
         if gui_displayers:

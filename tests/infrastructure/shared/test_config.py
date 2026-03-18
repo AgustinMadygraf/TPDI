@@ -44,6 +44,37 @@ class TestAppConfig:
 
         assert config.color_mode == "CMYK"
 
+    def test_app_config_defaults_to_file_source_and_index_zero(self):
+        """Default input source should be file and camera index 0."""
+        config = AppConfig()
+
+        assert config.image_source == "file"
+        assert config.camera_index == 0
+        assert config.fps == 10.0
+
+    def test_load_config_accepts_camera_source_and_index(self):
+        """Configuration should allow overriding image source and camera index."""
+        config = AppConfig.from_overrides(image_source="camera", camera_index=2)
+
+        assert config.image_source == "camera"
+        assert config.camera_index == 2
+
+    def test_load_config_accepts_fps(self):
+        """Configuration should allow overriding camera FPS."""
+        config = AppConfig.from_overrides(fps=30)
+
+        assert config.fps == 30
+
+    def test_load_config_rejects_negative_camera_index(self):
+        """Camera index must be zero or positive."""
+        with pytest.raises(ValueError, match="camera_index invalido"):
+            AppConfig.from_overrides(camera_index=-1)
+
+    def test_load_config_rejects_zero_fps(self):
+        """FPS must be greater than zero."""
+        with pytest.raises(ValueError, match="fps invalido"):
+            AppConfig.from_overrides(fps=0)
+
 
 
 

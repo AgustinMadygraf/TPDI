@@ -3,16 +3,32 @@ Path: src/infrastructure/opencv/cv2_video_loader.py
 """
 
 import time
-import cv2
 from typing import Iterator
-from src.use_cases.video_stream import VideoStreamPort
+
+import cv2
+
 from src.entities.image import Image
+from src.use_cases.video_stream import VideoStreamPort
+
+
+class CameraUnavailableError(RuntimeError):
+    """Error cuando la fuente de camara no esta disponible."""
+
 
 class CV2VideoLoader(VideoStreamPort):
+    def __init__(self, camera_index: int = 0):
+        self._camera_index = camera_index
+
     def get_video_stream(self, frame_interval: float = 0.1) -> Iterator[Image]:
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(self._camera_index)
         if not cap.isOpened():
-            raise RuntimeError("No se pudo abrir la cámara predeterminada.")
+            cap.release()
+            raise CameraUnavailableError(
+                f"No se pudo abrir la camara en indice {self._camera_index}. "
+                "Verifica que exista un dispositivo disponible, permisos de acceso "
+                "y prueba con --camera_index=1 (u otro). "
+                "Tambien puedes usar --image_source=file."
+            )
         try:
             while True:
                 ret, frame = cap.read()
