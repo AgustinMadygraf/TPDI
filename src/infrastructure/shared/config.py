@@ -8,24 +8,42 @@ from pathlib import Path
 from typing import ClassVar
 from src.use_cases.display_image import ImageDisplayPort
 
+COLOR_MODE_CHOICES: tuple[str, str, str] = ("RGB", "CMY", "CMYK")
+GUI_BACKEND_CHOICES: tuple[str, str] = ("cv2", "matplotlib")
+LOG_LEVEL_CHOICES: tuple[str, str, str, str, str] = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
 @dataclass(frozen=True)
 class AppConfigDefaults:
-    gui_backend: str = "cv2"
-    color_mode: str = "CMYK"
+    gui_backend: str = GUI_BACKEND_CHOICES[0]  # "cv2"
+    color_mode: str = COLOR_MODE_CHOICES[2]  # "CMYK"
     input_dir: Path = Path("data/input")
-    log_level: str = "INFO"
+    log_level: str = LOG_LEVEL_CHOICES[1]  # "INFO"
 
 APP_CONFIG_DEFAULTS = AppConfigDefaults()
 
 DisplayerRegistry = dict[str, type[ImageDisplayPort]]
-MODE_CHOICES: tuple[str, str, str] = ("RGB", "CMY", "CMYK")
 
 def parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="TPDI - Analisis de canales de color")
     parser.add_argument(
         "--mode",
-        choices=list(MODE_CHOICES),
+        choices=list(COLOR_MODE_CHOICES),
         help="Modo de color para el analisis (si se omite usa el default de config)",
+    )
+    parser.add_argument(
+        "--log_level",
+        choices=list(LOG_LEVEL_CHOICES),
+        help="Nivel de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
+    )
+    parser.add_argument(
+        "--gui_backend",
+        choices=list(GUI_BACKEND_CHOICES),
+        help="Backend de GUI para mostrar imagenes (cv2, matplotlib)",
+    )
+    parser.add_argument(
+        "--input_dir",
+        type=str,
+        help="Directorio de entrada de imagenes",
     )
     return parser.parse_args(argv)
 
@@ -44,8 +62,8 @@ class AppConfig:
             object.__setattr__(self, "input_dir", Path(self.input_dir))
 
         # Permite recibir strings (CLI/tests) y normaliza a enum tipado.
-        if self.color_mode not in MODE_CHOICES:
-            valid_modes = ", ".join(MODE_CHOICES)
+        if self.color_mode not in COLOR_MODE_CHOICES:
+            valid_modes = ", ".join(COLOR_MODE_CHOICES)
             raise ValueError(
                 f"color_mode invalido: '{self.color_mode}'. "
                 f"Valores permitidos: {valid_modes}"
