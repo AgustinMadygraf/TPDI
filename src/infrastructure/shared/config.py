@@ -17,7 +17,7 @@ class AppConfigDefaults:
     gui_backend: str = GUI_BACKEND_CHOICES[0]  # "cv2"
     color_mode: str = COLOR_MODE_CHOICES[2]  # "CMYK"
     input_dir: Path = Path("data/input")
-    log_level: str = LOG_LEVEL_CHOICES[1]  # "INFO"
+    log_level: str = LOG_LEVEL_CHOICES[0]  # "DEBUG"
 
 APP_CONFIG_DEFAULTS = AppConfigDefaults()
 
@@ -69,10 +69,6 @@ class AppConfig:
                 f"Valores permitidos: {valid_modes}"
             )
 
-
-
-        # Se elimina la validación de flexo_spot_palettes vacía para simplificar el modelo.
-
     @classmethod
     def register_displayer(
         cls, backend: str, displayer_class: type[ImageDisplayPort]
@@ -89,10 +85,7 @@ class AppConfig:
         # Asegurar que cv2 este registrado para exponer al menos un backend.
         if "cv2" not in cls._displayers:
             try:
-                from src.infrastructure.opencv.cv2_image_displayer import (
-                    CV2ImageDisplayer,
-                )
-
+                from src.infrastructure.opencv.cv2_image_displayer import CV2ImageDisplayer
                 cls.register_displayer("cv2", CV2ImageDisplayer)
             except ImportError:
                 pass
@@ -104,10 +97,7 @@ class AppConfig:
         if backend not in self._displayers:
             # Lazy loading de displayers built-in.
             if backend == "cv2":
-                from src.infrastructure.opencv.cv2_image_displayer import (
-                    CV2ImageDisplayer,
-                )
-
+                from src.infrastructure.opencv.cv2_image_displayer import CV2ImageDisplayer
                 self.register_displayer("cv2", CV2ImageDisplayer)
             elif backend == "matplotlib":
                 raise NotImplementedError(
