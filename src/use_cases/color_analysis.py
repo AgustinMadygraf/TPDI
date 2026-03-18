@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from typing import List, Literal
 
 from src.entities.image import Image
+from src.use_cases.color_separation import (
+    CmykSeparationPolicy,
+    GenericCmykSeparationPolicy,
+)
 from src.use_cases.image_processing import (
     apply_grayscale,
     blue_to_grayscale,
@@ -42,6 +46,9 @@ class ColorAnalysisResult:
 
 class ColorChannelAnalyzer:
     """Construye variantes de analisis de color para RGB, CMY o CMYK."""
+
+    def __init__(self, cmyk_policy: CmykSeparationPolicy | None = None) -> None:
+        self._cmyk_policy = cmyk_policy or GenericCmykSeparationPolicy()
 
     def execute(
         self, image: Image, color_mode: ColorMode
@@ -119,7 +126,7 @@ class ColorChannelAnalyzer:
 
     def _build_cmyk_analysis(self, image: Image) -> ColorAnalysisResult:
         cmyk_values = [
-            self._rgb_to_cmyk(
+            self._cmyk_policy.rgb_to_cmyk(
                 image.data[i], image.data[i + 1], image.data[i + 2]
             )
             for i in range(0, len(image.data), 3)
@@ -268,38 +275,10 @@ class ColorChannelAnalyzer:
         data = []
         for values in cmyk_values:
             intensity = values[source_index]
-            if source_index == 0:  # Cyan ink absorbs red over white substrate.
-                pixel = [255 - intensity, 255, 255]
-            elif source_index == 1:  # Magenta ink absorbs green.
-                pixel = [255, 255 - intensity, 255]
-            elif source_index == 2:  # Yellow ink absorbs blue.
-                pixel = [255, 255, 255 - intensity]
-            else:  # Key (black) darkens all channels.
-                value = 255 - intensity
-                pixel = [value, value, value]
+            pixel = self._cmyk_policy.channel_to_display_rgb(
+                source_index, intensity
+            )
             data.extend(pixel)
-
-        return Image(
-            name=f"{image.name}_{suffix}",
-            width=image.width,
-            height=image.height,
-            channels=3,
-            data=data,
-            path=image.path,
-        )
-
-    def _build_cmyk_channel_grayscale(
-        self,
-        image: Image,
-        cmyk_values: List[tuple[int, int, int, int]],
-        source_index: int,
-        suffix: str,
-    ) -> Image:
-        data = []
-        for values in cmyk_values:
-            intensity = values[source_index]
-            value = 255 - intensity
-            data.extend([value, value, value])
 
         return Image(
             name=f"{image.name}_{suffix}",
@@ -315,7 +294,9 @@ class ColorChannelAnalyzer:
     ) -> Image:
         data = []
         for cyan, magenta, yellow, black in cmyk_values:
-            gray = 255 - int((cyan + magenta + yellow + black) / 4)
+            gray = self._cmyk_policy.cmyk_to_display_gray(
+                cyan, magenta, yellow, black
+            )
             data.extend([gray, gray, gray])
 
         return Image(
@@ -327,24 +308,3 @@ class ColorChannelAnalyzer:
             path=image.path,
         )
 
-    def _rgb_to_cmyk(
-        self, red: int, green: int, blue: int
-    ) -> tuple[int, int, int, int]:
-        red_norm = red / 255.0
-        green_norm = green / 255.0
-        blue_norm = blue / 255.0
-
-        key = 1.0 - max(red_norm, green_norm, blue_norm)
-        if key >= 1.0:
-            return (0, 0, 0, 255)
-
-        cyan = (1.0 - red_norm - key) / (1.0 - key)
-        magenta = (1.0 - green_norm - key) / (1.0 - key)
-        yellow = (1.0 - blue_norm - key) / (1.0 - key)
-
-        return (
-            int(round(cyan * 255)),
-            int(round(magenta * 255)),
-            int(round(yellow * 255)),
-            int(round(key * 255)),
-        )

@@ -19,7 +19,14 @@ def main() -> None:
     displayer = DisplayerFactory.create(config)
 
     # Inicializar y ejecutar aplicación
-    app = CLIApp(loader, displayer, None, config.COLOR_MODE)
+    app = CLIApp(
+        loader,
+        displayer,
+        None,
+        config.COLOR_MODE,
+        config.CMYK_DOT_GAIN,
+        config.CMYK_TOTAL_INK_LIMIT,
+    )
     app.run_color_channel_analysis()
 
 

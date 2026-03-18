@@ -13,6 +13,7 @@ from src.use_cases.color_analysis import (
     ColorChannelAnalyzer,
     ColorMode,
 )
+from src.use_cases.color_separation import GenericCmykSeparationPolicy
 from src.interface_adapters.controllers.main_controller import MainController
 from src.use_cases.display_image import ImageDisplayPort
 from src.use_cases.load_images import ImageLoaderPort, LoadImagesFromDirectory
@@ -27,6 +28,8 @@ class CLIApp:
         displayer: ImageDisplayPort,
         base_path: Path = None,
         color_mode: ColorMode = "RGB",
+        cmyk_dot_gain: float = 0.0,
+        cmyk_total_ink_limit: int = 1020,
     ):
         setup_logging(name="tpdi")
         self._logger = get_logger(__name__)
@@ -34,7 +37,13 @@ class CLIApp:
         self._loader = loader
         self._base_path = base_path or MainController.DEFAULT_INPUT_DIR
         self._color_mode = color_mode
-        self._color_analyzer = ColorChannelAnalyzer()
+        self._cmyk_policy = GenericCmykSeparationPolicy(
+            dot_gain=cmyk_dot_gain,
+            total_ink_limit=cmyk_total_ink_limit,
+        )
+        self._color_analyzer = ColorChannelAnalyzer(
+            cmyk_policy=self._cmyk_policy
+        )
 
     def _on_load_error(self, path: Path, exc: Exception) -> None:
         "Callback para manejar errores de carga de imágenes."
@@ -252,7 +261,9 @@ class CLIApp:
         if self._color_mode == "CMY":
             return tuple(255 - value for value in values)
         if self._color_mode == "CMYK":
-            return self._rgb_to_cmyk(values[0], values[1], values[2])
+            return self._cmyk_policy.rgb_to_cmyk(
+                values[0], values[1], values[2]
+            )
         return values
 
     def _extract_channel_values_for_mode(self, image: Image) -> tuple[List[int], ...]:
@@ -276,7 +287,9 @@ class CLIApp:
             for red, green, blue in zip(
                 first_channel, second_channel, third_channel, strict=False
             ):
-                cyan, magenta, yellow, black = self._rgb_to_cmyk(red, green, blue)
+                cyan, magenta, yellow, black = self._cmyk_policy.rgb_to_cmyk(
+                    red, green, blue
+                )
                 cyan_values.append(cyan)
                 magenta_values.append(magenta)
                 yellow_values.append(yellow)
@@ -327,27 +340,6 @@ class CLIApp:
         return (
             f"  {label}: Pixel 0 -> R={variant_values[0]:3d}, G={variant_values[1]:3d}, "
             f"B={variant_values[2]:3d} | Esperado: {expected} | OK: {variant_values == expected}"
-        )
-
-    def _rgb_to_cmyk(self, red: int, green: int, blue: int) -> tuple[int, int, int, int]:
-        """Convierte un pixel RGB a CMYK en rango 0..255."""
-        red_norm = red / 255.0
-        green_norm = green / 255.0
-        blue_norm = blue / 255.0
-
-        key = 1.0 - max(red_norm, green_norm, blue_norm)
-        if key >= 1.0:
-            return (0, 0, 0, 255)
-
-        cyan = (1.0 - red_norm - key) / (1.0 - key)
-        magenta = (1.0 - green_norm - key) / (1.0 - key)
-        yellow = (1.0 - blue_norm - key) / (1.0 - key)
-
-        return (
-            int(round(cyan * 255)),
-            int(round(magenta * 255)),
-            int(round(yellow * 255)),
-            int(round(key * 255)),
         )
 
     def run(self) -> None:

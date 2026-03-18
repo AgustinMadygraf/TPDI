@@ -10,6 +10,7 @@
 |-----|--------|--------|-------|
 | [ADR-001](ADR-001-separar-interfaces-image-gateway.md) | Separar Interfaces de Image Gateway | ✅ Completada | 2026-03-16 |
 | [ADR-002](ADR-002-modelar-color-como-politica-externa-para-cmyk.md) | Modelar Color como Política Externa para CMYK | 🔄 Pendiente implementación | 2026-03-17 |
+| [ADR-003](ADR-003-priorizar-fidelidad-de-impresion-cuatricromia-y-ruta-flexo-2-plenos.md) | Priorizar Fidelidad de Impresión (Cuatricromía) y Ruta a Flexo 2 Plenos | ✅ Completada | 2026-03-17 |
 
 ---
 
@@ -17,10 +18,10 @@
 
 | Estado | Cantidad |
 |--------|----------|
-| ✅ Completadas | 1 |
+| ✅ Completadas | 2 |
 | 🔄 En Implementación | 1 |
 | ⏳ Propuestas | 0 |
-| **Total** | **2** |
+| **Total** | **3** |
 
 ---
 

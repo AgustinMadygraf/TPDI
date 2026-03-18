@@ -11,6 +11,10 @@
 
 ## Últimas Decisiones Resueltas
 
+- **2026-03-17**: ADR-003 - Priorizar Fidelidad de Impresión (Cuatricromía) y Ruta a Flexo 2 Plenos
+  - Ver: `docs/decisions/ADR-003-priorizar-fidelidad-de-impresion-cuatricromia-y-ruta-flexo-2-plenos.md`
+  - Estado: ✅ Aceptada
+
 - **2026-03-17**: ADR-002 - Modelar Color como Política Externa para CMYK
   - Ver: `docs/decisions/ADR-002-modelar-color-como-politica-externa-para-cmyk.md`
   - Estado: ✅ Aceptada / Pendiente de implementación

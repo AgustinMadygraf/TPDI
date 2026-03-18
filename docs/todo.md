@@ -1,7 +1,7 @@
 # Backlog Técnico - TPDI
 
 > Fecha: 2026-03-17
-> Enfoque actual: consolidar soporte configurable RGB, CMY y CMYK sin romper Clean Architecture
+> Enfoque actual: fidelidad de impresion real (cuatricromia) y preparacion para flexo de 2 colores plenos
 
 ---
 
@@ -85,14 +85,24 @@ Regla acordada:
 
 ---
 
-## Próximo Paso (CMYK)
+## Proximo Paso (Fidelidad de Impresion)
 
-Decisión de arquitectura tomada en `docs/decisions/ADR-002-modelar-color-como-politica-externa-para-cmyk.md`.
+Decisiones de arquitectura tomadas en:
 
-### Backlog de implementación CMYK
+- `docs/decisions/ADR-002-modelar-color-como-politica-externa-para-cmyk.md`
+- `docs/decisions/ADR-003-priorizar-fidelidad-de-impresion-cuatricromia-y-ruta-flexo-2-plenos.md`
 
-- [x] Extender `ColorMode` en configuración para incluir `CMYK`
-- [x] Extender el caso de uso de análisis configurable para producir variantes CMYK
-- [x] Definir estrategia visual para canal K en grid y etiquetas
-- [x] Adaptar CLI para reportes y depuración de 4 canales sin romper RGB/CMY
-- [x] Agregar pruebas unitarias e integración para flujo CMYK
+### Backlog de impresion real (cuatricromia)
+
+- [x] Definir interfaz de politica de separacion de color en casos de uso
+- [x] Implementar politica base de cuatricromia orientada a impresion (no solo visualizacion)
+- [x] Externalizar parametros de proceso (ganancia de punto, cobertura de tinta, limites de canal)
+- [x] Crear set de imagenes patron para regresion de separaciones CMYK
+- [x] Documentar limites de simulacion en monitor frente a resultado impreso
+
+### Backlog de evolucion a flexo 2 colores plenos
+
+- [ ] Definir modelo de tinta plana (spot) y configuracion de paletas
+- [ ] Implementar primera estrategia de reduccion a 2 canales de impresion
+- [ ] Agregar validaciones de cobertura total por proceso flexografico
+- [ ] Incorporar pruebas de regresion para escenarios 2 plenos

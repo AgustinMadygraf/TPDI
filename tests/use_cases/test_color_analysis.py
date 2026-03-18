@@ -2,6 +2,20 @@
 
 from src.entities.image import Image
 from src.use_cases.color_analysis import ColorChannelAnalyzer
+from src.use_cases.color_separation import CmykSeparationPolicy
+
+
+class DummyCmykPolicy(CmykSeparationPolicy):
+    """Simple policy double for validating policy wiring in analyzer."""
+
+    def rgb_to_cmyk(self, red: int, green: int, blue: int) -> tuple[int, int, int, int]:
+        return (10, 20, 30, 40)
+
+    def channel_to_display_rgb(self, channel_index: int, intensity: int) -> tuple[int, int, int]:
+        return (channel_index, intensity, 255)
+
+    def cmyk_to_display_gray(self, cyan: int, magenta: int, yellow: int, black: int) -> int:
+        return 123
 
 
 class TestColorChannelAnalyzer:
@@ -127,3 +141,23 @@ class TestColorChannelAnalyzer:
         assert yellow_channel.data == [255, 255, 255]
         assert black_channel.data == [30, 30, 30]
         assert grayscale.data == [135, 135, 135]
+
+    def test_execute_cmyk_uses_injected_separation_policy(self):
+        """Analyzer should delegate CMYK conversion and display mapping to policy."""
+        analyzer = ColorChannelAnalyzer(cmyk_policy=DummyCmykPolicy())
+        image = Image(
+            name="test.png",
+            width=1,
+            height=1,
+            channels=3,
+            data=[10, 20, 30],
+            path="/tmp/test.png",
+        )
+
+        result = analyzer.execute(image, "CMYK")
+
+        assert result.variants[0].image.data == [0, 10, 255]
+        assert result.variants[1].image.data == [1, 20, 255]
+        assert result.variants[2].image.data == [2, 30, 255]
+        assert result.variants[3].image.data == [3, 40, 255]
+        assert result.variants[4].image.data == [123, 123, 123]
