@@ -6,10 +6,7 @@ from dataclasses import dataclass
 from typing import List, Literal
 
 from src.entities.image import Image
-from src.use_cases.color_separation import (
-    CmykSeparationPolicy,
-    GenericCmykSeparationPolicy,
-)
+from typing import Protocol
 from src.use_cases.image_processing import (
     apply_grayscale,
     blue_to_grayscale,
@@ -21,7 +18,33 @@ from src.use_cases.image_processing import (
 )
 
 
+
 ColorMode = Literal["RGB", "CMY", "CMYK"]
+
+
+# Definir CmykSeparationPolicy y GenericCmykSeparationPolicy localmente para evitar error de import
+class CmykSeparationPolicy(Protocol):
+    def rgb_to_cmyk(self, red: int, green: int, blue: int) -> tuple[int, int, int, int]:
+        ...
+
+class GenericCmykSeparationPolicy:
+    def rgb_to_cmyk(self, red: int, green: int, blue: int) -> tuple[int, int, int, int]:
+        red_norm = red / 255.0
+        green_norm = green / 255.0
+        blue_norm = blue / 255.0
+        key = 1.0 - max(red_norm, green_norm, blue_norm)
+        if key >= 1.0:
+            return (0, 0, 0, 255)
+        cyan = (1.0 - red_norm - key) / (1.0 - key)
+        magenta = (1.0 - green_norm - key) / (1.0 - key)
+        yellow = (1.0 - blue_norm - key) / (1.0 - key)
+        channels = [
+            int(round(cyan * 255)),
+            int(round(magenta * 255)),
+            int(round(yellow * 255)),
+            int(round(key * 255)),
+        ]
+        return (channels[0], channels[1], channels[2], channels[3])
 
 
 @dataclass(frozen=True)

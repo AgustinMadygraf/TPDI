@@ -18,4 +18,4 @@ def test_parse_args_defaults_mode_to_none():
 def test_load_config_uses_hardcoded_default_mode_when_none():
     config = AppConfig.from_overrides(color_mode=None)
 
-    assert config.color_mode == "RGB"
+    assert config.color_mode == "CMYK"

@@ -26,8 +26,6 @@ class AppBootstrap:
             displayer,
             None,
             config.color_mode,
-            config.cmyk_dot_gain,
-            config.cmyk_total_ink_limit,
         )
         app.run_color_channel_analysis()
 

@@ -8,7 +8,6 @@ from src.entities.image import Image
 
 class ImageDisplayPort(Protocol):
     "Puerto para mostrar imágenes en pantalla."
-
     def display(
         self,
         image: Image,
@@ -16,14 +15,7 @@ class ImageDisplayPort(Protocol):
         layout: str = "vertical",
         comparison_labels: Optional[Tuple[str, str]] = None,
     ) -> None:
-        """Muestra la imagen en pantalla.
-
-        Args:
-            image: Imagen principal a mostrar.
-            comparison: Imagen opcional para comparación lado a lado.
-            layout: "vertical" (una sobre otra) o "horizontal" (lado a lado).
-            comparison_labels: Etiquetas opcionales (principal, comparación).
-        """
+        "Muestra una imagen, opcionalmente comparándola con otra."
         raise NotImplementedError
 
     def display_grid(
@@ -32,11 +24,5 @@ class ImageDisplayPort(Protocol):
         grid_size: Tuple[int, int] = (2, 2),
         title: str = "Grid",
     ) -> None:
-        """Muestra múltiples imágenes en una cuadrícula.
-
-        Args:
-            images: Lista de tuplas (imagen, etiqueta).
-            grid_size: Tupla (filas, columnas) para el grid.
-            title: Título de la ventana.
-        """
+        "Muestra una cuadrícula de imágenes con sus etiquetas."
         raise NotImplementedError

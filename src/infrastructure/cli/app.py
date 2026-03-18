@@ -28,8 +28,6 @@ class CLIApp:
         displayer: ImageDisplayPort,
         base_path: Path = None,
         color_mode: ColorMode = "RGB",
-        cmyk_dot_gain: float = 0.0,
-        cmyk_total_ink_limit: int = 1020,
     ):
         setup_logging(name="tpdi")
         self._logger = get_logger(__name__)
@@ -37,10 +35,7 @@ class CLIApp:
         self._loader = loader
         self._base_path = base_path or MainController.DEFAULT_INPUT_DIR
         self._color_mode = color_mode
-        self._cmyk_policy = GenericCmykSeparationPolicy(
-            dot_gain=cmyk_dot_gain,
-            total_ink_limit=cmyk_total_ink_limit,
-        )
+        self._cmyk_policy = GenericCmykSeparationPolicy()
         self._color_analyzer = ColorChannelAnalyzer(
             cmyk_policy=self._cmyk_policy
         )
