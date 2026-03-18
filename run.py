@@ -4,8 +4,10 @@ Path: run.py
 
 from src.infrastructure.cli.app import CLIApp
 from src.infrastructure.opencv.cv2_image_loader import CV2ImageLoader
+from src.infrastructure.opencv.cv2_video_loader import CV2VideoLoader
 from src.infrastructure.shared.config import AppConfig, parse_cli_args
 from src.infrastructure.shared.path_validator import PathValidator
+from src.interface_adapters.gateways.image_gateway import ImageGateway
 
 
 class AppBootstrap:
@@ -28,12 +30,22 @@ class AppBootstrap:
         loader = CV2ImageLoader(path_validator=path_validator)
         displayer = config.create_displayer()
 
+        # Inicializar gateway con ambos loaders
+        video_loader = CV2VideoLoader()
+        gateway = ImageGateway(
+            loader=loader,
+            video_streamer=video_loader,
+            base_path=config.input_dir,
+        )
+
         # Inicializar y ejecutar aplicacion
         app = CLIApp(
-            loader,
-            displayer,
-            None,
-            config.color_mode,
+            loader=loader,
+            displayer=displayer,
+            gateway=gateway,
+            config=config,
+            base_path=config.input_dir,
+            color_mode=config.color_mode,
         )
         app.run_color_channel_analysis()
 
@@ -48,7 +60,6 @@ def main() -> None:
         gui_backend=args.gui_backend,
         input_dir=args.input_dir,
     ).run()
-
 
 if __name__ == "__main__":
     main()

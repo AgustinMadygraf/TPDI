@@ -19,6 +19,10 @@ from src.use_cases.display_image import ImageDisplayPort
 from src.use_cases.load_images import ImageLoaderPort, LoadImagesFromDirectory
 
 
+
+from src.interface_adapters.gateways.image_gateway import ImageGateway
+from src.infrastructure.shared.config import AppConfig
+
 class CLIApp:
     "Aplicación de línea de comandos para TPDI."
 
@@ -26,6 +30,8 @@ class CLIApp:
         self,
         loader: ImageLoaderPort,
         displayer: ImageDisplayPort,
+        gateway: ImageGateway,
+        config: AppConfig,
         base_path: Path = None,
         color_mode: ColorMode = "RGB",
     ):
@@ -33,6 +39,8 @@ class CLIApp:
         self._logger = get_logger(__name__)
         self._displayer = displayer
         self._loader = loader
+        self._gateway = gateway
+        self._config = config
         self._base_path = base_path or MainController.DEFAULT_INPUT_DIR
         self._color_mode = color_mode
         self._cmyk_policy = GenericCmykSeparationPolicy()
@@ -56,26 +64,33 @@ class CLIApp:
         print("=" * 60)
         print()
 
-        # Cargar imágenes
-        print(f"Cargando imagenes desde: {self._base_path}")
-        images = self.load_images()
+        if self._config.image_source == "camera":
+            print("Capturando imagen desde cámara...")
+            stream = self._gateway.get_video_stream(frame_interval=0.1)
+            try:
+                original = next(stream)
+            except StopIteration:
+                print("ERROR: No se pudo capturar imagen de la cámara.")
+                return False
+            print(f"Imagen capturada: {original.name}")
+            print(f"  Dimensiones: {original.width}x{original.height}")
+            print(f"  Canales: {original.channels}")
+        else:
+            # Cargar imágenes desde archivos
+            print(f"Cargando imagenes desde: {self._base_path}")
+            images = self.load_images()
+            if not images:
+                print(f"ERROR: No se encontraron imagenes en: {self._base_path}")
+                print("Agrega imagenes PNG/JPG a la carpeta data/input/")
+                print()
+                return False
+            print(f"Cargadas {len(images)} imagen(es)")
+            original = images[0]
+            print(f"Imagen seleccionada: {original.name}")
+            print(f"  Dimensiones: {original.width}x{original.height}")
+            print(f"  Canales: {original.channels}")
 
-        if not images:
-            print(f"ERROR: No se encontraron imagenes en: {self._base_path}")
-            print("Agrega imagenes PNG/JPG a la carpeta data/input/")
-            print()
-            return False
-
-        print(f"Cargadas {len(images)} imagen(es)")
         print()
-
-        # Tomar la primera imagen
-        original = images[0]
-        print(f"Imagen seleccionada: {original.name}")
-        print(f"  Dimensiones: {original.width}x{original.height}")
-        print(f"  Canales: {original.channels}")
-        print()
-
         # Procesar variantes (con depuración incluida)
         analysis = self._process_color_variants(original)
 

@@ -11,6 +11,7 @@ from src.use_cases.display_image import ImageDisplayPort
 COLOR_MODE_CHOICES: tuple[str, str, str] = ("RGB", "CMY", "CMYK")
 GUI_BACKEND_CHOICES: tuple[str, str] = ("cv2", "matplotlib")
 LOG_LEVEL_CHOICES: tuple[str, str, str, str, str] = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+IMAGE_SOURCE_CHOICES: tuple[str, str] = ("file", "camera")
 
 @dataclass(frozen=True)
 class AppConfigDefaults:
@@ -18,6 +19,7 @@ class AppConfigDefaults:
     color_mode: str = COLOR_MODE_CHOICES[2]  # "CMYK"
     input_dir: Path = Path("data/input")
     log_level: str = LOG_LEVEL_CHOICES[0]  # "DEBUG"
+    image_source: str = IMAGE_SOURCE_CHOICES[1]  # "camera"
 
 APP_CONFIG_DEFAULTS = AppConfigDefaults()
 
@@ -45,7 +47,13 @@ def parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=str,
         help="Directorio de entrada de imagenes",
     )
+    parser.add_argument(
+        "--image_source",
+        choices=list(IMAGE_SOURCE_CHOICES),
+        help="Fuente de imagen: 'file' o 'camera' (por defecto: file)",
+    )
     return parser.parse_args(argv)
+
 
 @dataclass(frozen=True)
 class AppConfig:
@@ -55,6 +63,7 @@ class AppConfig:
     color_mode: str = APP_CONFIG_DEFAULTS.color_mode
     input_dir: Path = APP_CONFIG_DEFAULTS.input_dir
     log_level: str = APP_CONFIG_DEFAULTS.log_level
+    image_source: str = APP_CONFIG_DEFAULTS.image_source
 
     def __post_init__(self):
         # Validar que input_dir sea un Path valido.
@@ -67,6 +76,12 @@ class AppConfig:
             raise ValueError(
                 f"color_mode invalido: '{self.color_mode}'. "
                 f"Valores permitidos: {valid_modes}"
+            )
+        if self.image_source not in IMAGE_SOURCE_CHOICES:
+            valid_sources = ", ".join(IMAGE_SOURCE_CHOICES)
+            raise ValueError(
+                f"image_source invalido: '{self.image_source}'. "
+                f"Valores permitidos: {valid_sources}"
             )
 
     @classmethod
