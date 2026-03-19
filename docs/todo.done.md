@@ -382,3 +382,30 @@ run.py                            # Solo wiring (22 líneas)
 ---
 
 *Procesado automáticamente por skill todo-workflow*
+
+---
+
+## Procesamiento Autonomo - 2026-03-19 (`todo-workflow`)
+
+### Resumen de procesamiento
+- Tareas pendientes detectadas en `docs/todo.md`: **4**
+- Hallazgos abiertos de auditoria backend en `docs/todo.md`: **3**
+- Certezas ejecutadas: **0**
+- Dudas de bajo nivel ejecutadas: **0**
+- Dudas de alto nivel escaladas: **7**
+
+### Tareas escaladas a `docs/decisions/preguntas-arquitectura.md`
+- [escalada] La entidad `Image` no expresa el modelo de color.
+- [escalada] Implementar primera estrategia de reduccion a 2 canales de impresion.
+- [escalada] Agregar validaciones de cobertura total por proceso flexografico.
+- [escalada] Incorporar pruebas de regresion para escenarios 2 plenos.
+- [escalada] Definir limites de tamano/dimension para carga segura de imagenes.
+- [escalada] Definir estrategia de optimizacion del stream de camara sin `tolist()` por frame.
+- [escalada] Definir estrategia de optimizacion CMYK (vectorizacion o fusion de pasadas).
+
+### Justificacion de clasificacion
+Todas las tareas se clasificaron como **dudas de alto nivel** por impacto transversal (contratos de dominio, pipeline de procesamiento, validaciones de proceso de impresion y estrategia de testing/performance), con potencial de afectar multiples archivos/capas.
+
+### Estado final
+- `docs/todo.md`: vacio (sin tareas activas).
+- `docs/decisions/preguntas-arquitectura.md`: actualizado con preguntas activas pendientes.
