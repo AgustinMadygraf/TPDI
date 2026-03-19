@@ -270,8 +270,8 @@ class TestCLIAppColorChannelAnalysis:
         assert "ESCALA DE GRISES" in names
         assert len(analysis.variants) == 5
 
-    def test_display_grid_cmyk_uses_2x3_with_six_images(self, app, sample_image):
-        """CMYK analysis should show 2x3 with Original, Gray, C, M, Y, K."""
+    def test_display_grid_cmyk_uses_2x2_with_four_channel_images(self, app, sample_image):
+        """CMYK analysis should show a 2x2 grid with C, M, Y, K only."""
         analysis = ColorAnalysisResult(
             mode="CMYK",
             debug_title="DEPURACION DE CANALES CMYK",
@@ -288,19 +288,16 @@ class TestCLIAppColorChannelAnalysis:
                 ColorAnalysisVariant("CANAL MAGENTA", Mock()),
                 ColorAnalysisVariant("CANAL AMARILLO", Mock()),
                 ColorAnalysisVariant("CANAL NEGRO", Mock()),
-                ColorAnalysisVariant("ESCALA DE GRISES", Mock()),
             ],
         )
 
         app.display_grid_analysis(sample_image, analysis)
 
         call_args = app.displayer.display_grid.call_args
-        assert call_args[1]['grid_size'] == (3, 2)
-        assert len(call_args[1]['images']) == 6
+        assert call_args[1]['grid_size'] == (2, 2)
+        assert len(call_args[1]['images']) == 4
         labels = [label for _, label in call_args[1]['images']]
         assert labels == [
-            "ORIGINAL",
-            "ESCALA DE GRISES",
             "CANAL CIAN",
             "CANAL MAGENTA",
             "CANAL AMARILLO",

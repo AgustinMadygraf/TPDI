@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from src.infrastructure.cli.app import CLIApp
 from src.infrastructure.opencv.cv2_video_loader import CameraUnavailableError
 from src.infrastructure.shared.config import AppConfig
+from src.entities.image import Image
 
 
 def _build_app(
@@ -37,12 +38,7 @@ def _build_app(
 
 def test_run_color_channel_analysis_handles_camera_unavailable_error(capsys):
     app, gateway = _build_app(image_source="camera", camera_index=1)
-
-    def _failing_stream():
-        raise CameraUnavailableError("camara ocupada")
-        yield  # pragma: no cover
-
-    gateway.get_video_stream.return_value = _failing_stream()
+    gateway.get_frame.side_effect = CameraUnavailableError("camara ocupada")
 
     result = app.run_color_channel_analysis()
     captured = capsys.readouterr()
@@ -55,12 +51,7 @@ def test_run_color_channel_analysis_handles_camera_unavailable_error(capsys):
 
 def test_run_color_channel_analysis_handles_runtime_error_from_camera(capsys):
     app, gateway = _build_app(image_source="camera", camera_index=2)
-
-    def _runtime_error_stream():
-        raise RuntimeError("fallo de backend de video")
-        yield  # pragma: no cover
-
-    gateway.get_video_stream.return_value = _runtime_error_stream()
+    gateway.get_frame.side_effect = RuntimeError("fallo de backend de video")
 
     result = app.run_color_channel_analysis()
     captured = capsys.readouterr()
@@ -69,3 +60,28 @@ def test_run_color_channel_analysis_handles_runtime_error_from_camera(capsys):
     assert "ERROR: No se pudo iniciar la camara." in captured.out
     assert "fallo de backend de video" in captured.out
     assert "--image_source=file" in captured.out
+
+
+def test_run_color_channel_analysis_stream_uses_video_stream():
+    app, gateway = _build_app(image_source="camera", camera_index=0)
+    app._config = AppConfig.from_overrides(
+        image_source="camera",
+        camera_mode="stream",
+        fps=20,
+        color_mode="RGB",
+    )
+    frame = Image(
+        name="frame",
+        width=2,
+        height=2,
+        channels=3,
+        data=[0] * 12,
+        path=None,
+    )
+    gateway.get_video_stream.return_value = iter([frame])
+
+    result = app.run_color_channel_analysis()
+
+    assert result is True
+    gateway.get_video_stream.assert_called_once_with(frame_interval=0.05)
+    gateway.get_frame.assert_not_called()

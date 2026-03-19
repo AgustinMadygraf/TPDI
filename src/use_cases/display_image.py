@@ -7,7 +7,8 @@ from src.entities.image import Image
 
 
 class ImageDisplayPort(Protocol):
-    "Puerto para mostrar imágenes en pantalla."
+    "Puerto para mostrar imagenes en pantalla."
+
     def display(
         self,
         image: Image,
@@ -15,7 +16,7 @@ class ImageDisplayPort(Protocol):
         layout: str = "vertical",
         comparison_labels: Optional[Tuple[str, str]] = None,
     ) -> None:
-        "Muestra una imagen, opcionalmente comparándola con otra."
+        "Muestra una imagen, opcionalmente comparandola con otra."
         raise NotImplementedError
 
     def display_grid(
@@ -23,6 +24,9 @@ class ImageDisplayPort(Protocol):
         images: List[Tuple[Image, str]],
         grid_size: Tuple[int, int] = (2, 2),
         title: str = "Grid",
-    ) -> None:
-        "Muestra una cuadrícula de imágenes con sus etiquetas."
+        wait_ms: int = 0,
+        close_on_exit: bool = True,
+        quit_key: str | None = None,
+    ) -> bool:
+        "Muestra una cuadricula de imagenes con sus etiquetas."
         raise NotImplementedError

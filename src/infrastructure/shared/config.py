@@ -19,6 +19,8 @@ LOG_LEVEL_CHOICES: tuple[str, str, str, str, str] = (
     "CRITICAL",
 )
 IMAGE_SOURCE_CHOICES: tuple[str, str] = ("file", "camera")
+GRID_CHOICES: tuple[str, str] = ("2x2", "2x3")
+CAMERA_MODE_CHOICES: tuple[str, str] = ("snapshot", "stream")
 
 @dataclass(frozen=True)
 class AppConfigDefaults:
@@ -29,6 +31,10 @@ class AppConfigDefaults:
     image_source: str = IMAGE_SOURCE_CHOICES[0]  # "file"
     camera_index: int = 0
     fps: float = 10.0
+    grid: str = GRID_CHOICES[0]  # "2x2"
+    camera_mode: str = CAMERA_MODE_CHOICES[0]  # "snapshot"
+    frame_width: int | None = None
+    frame_height: int | None = None
 
 APP_CONFIG_DEFAULTS = AppConfigDefaults()
 
@@ -80,6 +86,32 @@ def parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
             f"(por defecto: {APP_CONFIG_DEFAULTS.fps})"
         ),
     )
+    parser.add_argument(
+        "--camera_mode",
+        choices=list(CAMERA_MODE_CHOICES),
+        help=(
+            "Modo de camara: 'snapshot' (1 frame) o 'stream' (continuo) "
+            f"(por defecto: {APP_CONFIG_DEFAULTS.camera_mode})"
+        ),
+    )
+    parser.add_argument(
+        "--frame_width",
+        type=int,
+        help="Ancho solicitado para captura de camara en pixeles.",
+    )
+    parser.add_argument(
+        "--frame_height",
+        type=int,
+        help="Alto solicitado para captura de camara en pixeles.",
+    )
+    parser.add_argument(
+        "--grid",
+        choices=list(GRID_CHOICES),
+        help=(
+            "Layout de grilla para analisis CMYK "
+            f"(por defecto: {APP_CONFIG_DEFAULTS.grid})"
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -94,6 +126,10 @@ class AppConfig:
     image_source: str = APP_CONFIG_DEFAULTS.image_source
     camera_index: int = APP_CONFIG_DEFAULTS.camera_index
     fps: float = APP_CONFIG_DEFAULTS.fps
+    grid: str = APP_CONFIG_DEFAULTS.grid
+    camera_mode: str = APP_CONFIG_DEFAULTS.camera_mode
+    frame_width: int | None = APP_CONFIG_DEFAULTS.frame_width
+    frame_height: int | None = APP_CONFIG_DEFAULTS.frame_height
 
     def __post_init__(self):
         # Validar que input_dir sea un Path valido.
@@ -124,6 +160,21 @@ class AppConfig:
         if self.fps <= 0:
             raise ValueError("fps invalido: debe ser > 0.")
         object.__setattr__(self, "fps", float(self.fps))
+        if self.grid not in GRID_CHOICES:
+            valid_grids = ", ".join(GRID_CHOICES)
+            raise ValueError(
+                f"grid invalido: '{self.grid}'. Valores permitidos: {valid_grids}"
+            )
+        if self.camera_mode not in CAMERA_MODE_CHOICES:
+            valid_camera_modes = ", ".join(CAMERA_MODE_CHOICES)
+            raise ValueError(
+                f"camera_mode invalido: '{self.camera_mode}'. "
+                f"Valores permitidos: {valid_camera_modes}"
+            )
+        if self.frame_width is not None and self.frame_width <= 0:
+            raise ValueError("frame_width invalido: debe ser > 0.")
+        if self.frame_height is not None and self.frame_height <= 0:
+            raise ValueError("frame_height invalido: debe ser > 0.")
 
     @classmethod
     def register_displayer(
@@ -180,6 +231,10 @@ class AppConfig:
         image_source: str = None,
         camera_index: int = None,
         fps: float = None,
+        grid: str = None,
+        camera_mode: str = None,
+        frame_width: int | None = None,
+        frame_height: int | None = None,
     ) -> "AppConfig":
         kwargs = {}
         if gui_backend is not None:
@@ -196,6 +251,14 @@ class AppConfig:
             kwargs["camera_index"] = camera_index
         if fps is not None:
             kwargs["fps"] = fps
+        if grid is not None:
+            kwargs["grid"] = grid
+        if camera_mode is not None:
+            kwargs["camera_mode"] = camera_mode
+        if frame_width is not None:
+            kwargs["frame_width"] = frame_width
+        if frame_height is not None:
+            kwargs["frame_height"] = frame_height
 
         config = cls(**kwargs)
         if gui_displayers:

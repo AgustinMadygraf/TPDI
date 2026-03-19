@@ -30,10 +30,14 @@ class MockImageDisplayer:
         images: List[Tuple[Image, str]],
         grid_size: Tuple[int, int] = (2, 2),
         title: str = "Grid",
-    ) -> None:
-        _ = (grid_size, title)
+        wait_ms: int = 0,
+        close_on_exit: bool = True,
+        quit_key: str | None = None,
+    ) -> bool:
+        _ = (grid_size, title, wait_ms, close_on_exit, quit_key)
         for image, _ in images:
             self.displayed_images.append(image)
+        return True
 
 
 class TestImageDisplayPort:

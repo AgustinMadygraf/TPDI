@@ -31,6 +31,10 @@ class ImageGateway:
         """Devuelve un generador de frames desde la fuente de video configurada."""
         return self._video_streamer.get_video_stream(frame_interval=frame_interval)
 
+    def get_frame(self) -> Image:
+        """Captura un unico frame desde la fuente de video configurada."""
+        return self._video_streamer.get_frame()
+
     def load_all(self) -> list[Image]:
         """Carga todas las imágenes del directorio base.
 

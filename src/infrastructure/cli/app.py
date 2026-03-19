@@ -4,6 +4,7 @@ Path: src/infrastructure/cli/app.py
 
 from pathlib import Path
 import math
+from types import SimpleNamespace
 from typing import List
 
 from src.entities.image import Image
@@ -30,8 +31,8 @@ class CLIApp:
         self,
         loader: ImageLoaderPort,
         displayer: ImageDisplayPort,
-        gateway: ImageGateway,
-        config: AppConfig,
+        gateway: ImageGateway | None = None,
+        config: AppConfig | None = None,
         base_path: Path = None,
         color_mode: ColorMode = "RGB",
     ):
@@ -39,8 +40,13 @@ class CLIApp:
         self._logger = get_logger(__name__)
         self._displayer = displayer
         self._loader = loader
-        self._gateway = gateway
-        self._config = config
+        self._gateway = gateway or SimpleNamespace(
+            get_video_stream=lambda frame_interval: iter(()),
+            get_frame=lambda: None,
+        )
+        self._config = config or AppConfig.from_overrides(
+            color_mode=color_mode
+        )
         self._base_path = base_path or MainController.DEFAULT_INPUT_DIR
         self._color_mode = color_mode
         self._cmyk_policy = GenericCmykSeparationPolicy()
@@ -58,39 +64,35 @@ class CLIApp:
         return use_case.execute(self._base_path)
 
     def run_color_channel_analysis(self) -> bool:
-        "Ejecuta análisis de canales de color en grid 2x4."
+        "Ejecuta analisis de canales de color con layout segun modo."
         print("=" * 60)
         print("TPDI - Analisis de Canales de Color")
         print("=" * 60)
         print()
 
         if self._config.image_source == "camera":
-            frame_interval = 1.0 / self._config.fps
+            if self._config.camera_mode == "stream":
+                return self._run_camera_stream_analysis()
             print(
                 "Capturando imagen desde camara... "
-                f"(indice: {self._config.camera_index}, "
-                f"fps: {self._config.fps:.2f}, "
-                f"intervalo: {frame_interval:.3f}s)"
+                f"(indice: {self._config.camera_index})"
             )
             try:
-                stream = self._gateway.get_video_stream(
-                    frame_interval=frame_interval
-                )
-                original = next(stream)
+                original = self._gateway.get_frame()
             except CameraUnavailableError as exc:
                 self._print_camera_unavailable_help(exc)
                 return False
             except RuntimeError as exc:
                 self._print_camera_unavailable_help(exc)
                 return False
-            except StopIteration:
+            if original is None:
                 print("ERROR: No se pudo capturar imagen de la camara.")
                 return False
             print(f"Imagen capturada: {original.name}")
             print(f"  Dimensiones: {original.width}x{original.height}")
             print(f"  Canales: {original.channels}")
         else:
-            # Cargar imágenes desde archivos
+            # Cargar imagenes desde archivos
             print(f"Cargando imagenes desde: {self._base_path}")
             images = self.load_images()
             if not images:
@@ -105,13 +107,58 @@ class CLIApp:
             print(f"  Canales: {original.channels}")
 
         print()
-        # Procesar variantes (con depuración incluida)
         analysis = self._process_color_variants(original)
 
-        # Mostrar grid 2x4
         print()
         self._display_grid_2x4(original, analysis)
 
+        print()
+        print("=" * 60)
+        print("Aplicacion finalizada.")
+        print("=" * 60)
+        return True
+
+    def _run_camera_stream_analysis(self) -> bool:
+        """Ejecuta analisis continuo desde camara hasta que el usuario presione 'q'."""
+        frame_interval = 1.0 / self._config.fps
+        print(
+            "Iniciando stream de camara... "
+            f"(indice: {self._config.camera_index}, fps_objetivo: {self._config.fps:.2f})"
+        )
+        print("Presiona 'q' en la ventana para salir del stream.")
+        print()
+
+        processed_frames = 0
+        try:
+            stream = self._gateway.get_video_stream(frame_interval=frame_interval)
+            for original in stream:
+                analysis = self._color_analyzer.execute(original, self._color_mode)
+                should_continue = self._display_grid_2x4(
+                    original,
+                    analysis,
+                    show_console_output=False,
+                    wait_ms=1,
+                    close_on_exit=False,
+                )
+                processed_frames += 1
+                if not should_continue:
+                    break
+        except CameraUnavailableError as exc:
+            self._print_camera_unavailable_help(exc)
+            return False
+        except RuntimeError as exc:
+            self._print_camera_unavailable_help(exc)
+            return False
+        finally:
+            close_windows = getattr(self._displayer, "close_windows", None)
+            if callable(close_windows):
+                close_windows()
+
+        if processed_frames == 0:
+            print("ERROR: No se pudo capturar imagen de la camara.")
+            return False
+
+        print(f"Stream finalizado. Frames procesados: {processed_frames}")
         print()
         print("=" * 60)
         print("Aplicacion finalizada.")
@@ -230,40 +277,61 @@ class CLIApp:
 
         return analysis
 
-    def _display_grid_2x4(self, original: Image, analysis: ColorAnalysisResult) -> None:
-        """Muestra un grid de analisis con tamaño dinamico segun variantes.
-
-        Args:
-            original: Imagen original.
-            analysis: Resultado procesado para display.
-        """
+    def _display_grid_2x4(
+        self,
+        original: Image,
+        analysis: ColorAnalysisResult,
+        show_console_output: bool = True,
+        wait_ms: int = 0,
+        close_on_exit: bool = True,
+    ) -> bool:
+        """Muestra un grid de analisis con tamano dinamico segun variantes."""
         if analysis.mode == "CMYK":
-            print("Mostrando grid de analisis 2x3:")
-            rows, cols = (3, 2)
             variant_by_label = {variant.label: variant for variant in analysis.variants}
-            ordered_labels = [
-                "ORIGINAL",
-                "ESCALA DE GRISES",
-                "CANAL CIAN",
-                "CANAL MAGENTA",
-                "CANAL AMARILLO",
-                "CANAL NEGRO",
-            ]
+            if self._config.grid == "2x3":
+                if show_console_output:
+                    print("Mostrando grid de analisis 2x3:")
+                rows, cols = (3, 2)
+                ordered_labels = [
+                    "ORIGINAL",
+                    "ESCALA DE GRISES",
+                    "CANAL CIAN",
+                    "CANAL MAGENTA",
+                    "CANAL AMARILLO",
+                    "CANAL NEGRO",
+                ]
 
-            grid_images = [(original, "ORIGINAL")]
-            grid_images.extend(
-                (variant_by_label[label].image, label)
-                for label in ordered_labels[1:]
-                if label in variant_by_label
-            )
+                grid_images = [(original, "ORIGINAL")]
+                grid_images.extend(
+                    (variant_by_label[label].image, label)
+                    for label in ordered_labels[1:]
+                    if label in variant_by_label
+                )
+            else:
+                if show_console_output:
+                    print("Mostrando grid de analisis 2x2 (CMYK):")
+                rows, cols = (2, 2)
+                ordered_labels = [
+                    "CANAL CIAN",
+                    "CANAL MAGENTA",
+                    "CANAL AMARILLO",
+                    "CANAL NEGRO",
+                ]
+                grid_images = [
+                    (variant_by_label[label].image, label)
+                    for label in ordered_labels
+                    if label in variant_by_label
+                ]
 
             for row in range(rows):
                 start = row * cols
                 end = start + cols
                 row_items = ordered_labels[start:end]
-                print(f"  [FILA {row + 1}] " + " | ".join(row_items))
+                if show_console_output:
+                    print(f"  [FILA {row + 1}] " + " | ".join(row_items))
         else:
-            print("Mostrando grid de analisis 2x4:")
+            if show_console_output:
+                print("Mostrando grid de analisis 2x4:")
             grid_labels = [variant.label for variant in analysis.variants]
             total_images = 1 + len(grid_labels)
             cols = 4
@@ -276,20 +344,28 @@ class CLIApp:
                     row_items = ["ORIGINAL", *grid_labels[: cols - 1]]
                 else:
                     row_items = grid_labels[start - 1 : end - 1]
-                if row_items:
+                if row_items and show_console_output:
                     print(f"  [FILA {row + 1}] " + " | ".join(row_items))
 
             grid_images = [
                 (original, "ORIGINAL"),
                 *[(variant.image, variant.label) for variant in analysis.variants],
             ]
-        print()
-        print("Presiona cualquier tecla en la ventana para cerrar...")
-        print()
 
-        self._displayer.display_grid(
-            images=grid_images, grid_size=(rows, cols), title=analysis.analysis_title
+        if show_console_output:
+            print()
+            print("Presiona cualquier tecla en la ventana para cerrar...")
+            print()
+
+        display_result = self._displayer.display_grid(
+            images=grid_images,
+            grid_size=(rows, cols),
+            title=analysis.analysis_title,
+            wait_ms=wait_ms,
+            close_on_exit=close_on_exit,
+            quit_key="q",
         )
+        return True if display_result is None else bool(display_result)
 
     def _convert_pixel_for_mode(self, values: tuple[int, ...]) -> tuple[int, ...]:
         """Convierte un pixel RGB al modo de color activo para depuracion."""
@@ -416,3 +492,4 @@ class CLIApp:
         """Muestra comparación lado a lado de dos imágenes."""
         self._logger.info("Mostrando comparacion: %s", original.name)
         self._displayer.display(original, modified)
+

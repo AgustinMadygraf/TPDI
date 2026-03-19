@@ -34,12 +34,32 @@ def test_parse_args_accepts_fps():
     assert args.fps == 20
 
 
+def test_parse_args_accepts_grid_2x2():
+    args = parse_cli_args(["--grid=2x2"])
+
+    assert args.grid == "2x2"
+
+
+def test_parse_args_accepts_camera_mode_and_resolution():
+    args = parse_cli_args(
+        ["--camera_mode=stream", "--frame_width=1280", "--frame_height=720"]
+    )
+
+    assert args.camera_mode == "stream"
+    assert args.frame_width == 1280
+    assert args.frame_height == 720
+
+
 def test_load_config_defaults_to_file_source_and_index_zero():
     config = AppConfig.from_overrides()
 
     assert config.image_source == "file"
     assert config.camera_index == 0
     assert config.fps == 10.0
+    assert config.grid == "2x2"
+    assert config.camera_mode == "snapshot"
+    assert config.frame_width is None
+    assert config.frame_height is None
 
 
 def test_load_config_accepts_image_source_and_camera_index():

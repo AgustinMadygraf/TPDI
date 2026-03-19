@@ -20,6 +20,10 @@ class AppBootstrap:
         image_source: str | None = None,
         camera_index: int | None = None,
         fps: float | None = None,
+        grid: str | None = None,
+        camera_mode: str | None = None,
+        frame_width: int | None = None,
+        frame_height: int | None = None,
     ):
         self._mode = mode
         self._log_level = log_level
@@ -28,6 +32,10 @@ class AppBootstrap:
         self._image_source = image_source
         self._camera_index = camera_index
         self._fps = fps
+        self._grid = grid
+        self._camera_mode = camera_mode
+        self._frame_width = frame_width
+        self._frame_height = frame_height
 
     def run(self) -> bool:
         config = AppConfig.from_overrides(
@@ -38,6 +46,10 @@ class AppBootstrap:
             image_source=self._image_source,
             camera_index=self._camera_index,
             fps=self._fps,
+            grid=self._grid,
+            camera_mode=self._camera_mode,
+            frame_width=self._frame_width,
+            frame_height=self._frame_height,
         )
 
         # Crear dependencias
@@ -46,7 +58,11 @@ class AppBootstrap:
         displayer = config.create_displayer()
 
         # Inicializar gateway con ambos loaders
-        video_loader = CV2VideoLoader(camera_index=config.camera_index)
+        video_loader = CV2VideoLoader(
+            camera_index=config.camera_index,
+            frame_width=config.frame_width,
+            frame_height=config.frame_height,
+        )
         gateway = ImageGateway(
             loader=loader,
             video_streamer=video_loader,
@@ -77,6 +93,10 @@ def main() -> None:
         image_source=args.image_source,
         camera_index=args.camera_index,
         fps=args.fps,
+        grid=args.grid,
+        camera_mode=args.camera_mode,
+        frame_width=args.frame_width,
+        frame_height=args.frame_height,
     ).run()
     raise SystemExit(0 if success else 1)
 

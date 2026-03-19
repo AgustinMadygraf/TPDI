@@ -19,8 +19,16 @@ class DummyDisplayer:
     ):
         return None
 
-    def display_grid(self, _images, _grid_size=(2, 2), _title="Grid"):
-        return None
+    def display_grid(
+        self,
+        _images,
+        _grid_size=(2, 2),
+        _title="Grid",
+        _wait_ms=0,
+        _close_on_exit=True,
+        _quit_key=None,
+    ):
+        return True
 
 
 class TestAppConfig:
@@ -51,6 +59,7 @@ class TestAppConfig:
         assert config.image_source == "file"
         assert config.camera_index == 0
         assert config.fps == 10.0
+        assert config.grid == "2x2"
 
     def test_load_config_accepts_camera_source_and_index(self):
         """Configuration should allow overriding image source and camera index."""
@@ -65,6 +74,24 @@ class TestAppConfig:
 
         assert config.fps == 30
 
+    def test_load_config_accepts_grid(self):
+        """Configuration should allow overriding CMYK grid layout."""
+        config = AppConfig.from_overrides(grid="2x3")
+
+        assert config.grid == "2x3"
+
+    def test_load_config_accepts_camera_mode_and_resolution(self):
+        """Camera mode and requested resolution should be configurable."""
+        config = AppConfig.from_overrides(
+            camera_mode="stream",
+            frame_width=1280,
+            frame_height=720,
+        )
+
+        assert config.camera_mode == "stream"
+        assert config.frame_width == 1280
+        assert config.frame_height == 720
+
     def test_load_config_rejects_negative_camera_index(self):
         """Camera index must be zero or positive."""
         with pytest.raises(ValueError, match="camera_index invalido"):
@@ -74,6 +101,23 @@ class TestAppConfig:
         """FPS must be greater than zero."""
         with pytest.raises(ValueError, match="fps invalido"):
             AppConfig.from_overrides(fps=0)
+
+    def test_load_config_rejects_unknown_grid(self):
+        """Grid must be one of the known layout options."""
+        with pytest.raises(ValueError, match="grid invalido"):
+            AppConfig.from_overrides(grid="4x4")
+
+    def test_load_config_rejects_unknown_camera_mode(self):
+        """Camera mode must be one of the known options."""
+        with pytest.raises(ValueError, match="camera_mode invalido"):
+            AppConfig.from_overrides(camera_mode="realtime")
+
+    def test_load_config_rejects_invalid_frame_dimensions(self):
+        """Frame dimensions must be greater than zero when provided."""
+        with pytest.raises(ValueError, match="frame_width invalido"):
+            AppConfig.from_overrides(frame_width=0)
+        with pytest.raises(ValueError, match="frame_height invalido"):
+            AppConfig.from_overrides(frame_height=-1)
 
 
 

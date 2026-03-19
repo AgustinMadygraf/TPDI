@@ -96,12 +96,15 @@ class CV2ImageDisplayer(ImageDisplayPort):
         images: List[Tuple[Image, str]],
         grid_size: Tuple[int, int] = (2, 2),
         title: str = "Grid",
-    ) -> None:
-        "Muestra un grid de imágenes con etiquetas usando OpenCV."
+        wait_ms: int = 0,
+        close_on_exit: bool = True,
+        quit_key: str | None = None,
+    ) -> bool:
+        "Muestra un grid de imagenes con etiquetas usando OpenCV."
         rows, cols = grid_size
         label_height = 30
 
-        # Preparar todas las imágenes con sus etiquetas
+        # Preparar todas las imagenes con sus etiquetas
         cells = []
         for img, label in images:
             data = self._numpy_adapter.to_numpy(img)
@@ -124,15 +127,15 @@ class CV2ImageDisplayer(ImageDisplayPort):
             cell = self._numpy_adapter.vstack([label_img, display_data])
             cells.append(cell)
 
-        # Determinar tamaño de celda (usar el máximo para uniformidad)
+        # Determinar tamano de celda (usar el maximo para uniformidad)
         if not cells:
-            self._logger.warning("No hay imágenes para mostrar en grid")
-            return
+            self._logger.warning("No hay imagenes para mostrar en grid")
+            return True
 
         max_height = max(cell.shape[0] for cell in cells)
         max_width = max(cell.shape[1] for cell in cells)
 
-        # Normalizar todas las celdas al mismo tamaño
+        # Normalizar todas las celdas al mismo tamano
         normalized_cells = []
         for cell in cells:
             if cell.shape[0] != max_height or cell.shape[1] != max_width:
@@ -141,7 +144,7 @@ class CV2ImageDisplayer(ImageDisplayPort):
                 normalized = cell
             normalized_cells.append(normalized)
 
-        # Rellenar celdas vacías si es necesario
+        # Rellenar celdas vacias si es necesario
         total_cells = rows * cols
         while len(normalized_cells) < total_cells:
             empty_cell = self._numpy_adapter.zeros((max_height, max_width, 3))
@@ -154,17 +157,30 @@ class CV2ImageDisplayer(ImageDisplayPort):
             end_idx = start_idx + cols
             row_cells = normalized_cells[start_idx:end_idx]
 
-            # Concatenar horizontalmente
             if row_cells:
                 row_img = self._numpy_adapter.hstack(row_cells)
                 grid_rows.append(row_img)
 
-        # Concatenar verticalmente todas las filas
         if grid_rows:
             grid_img = self._numpy_adapter.vstack(grid_rows)
             cv2.imshow(title, grid_img)
             self._logger.info("Mostrando grid %dx%d: %s", rows, cols, title)
 
-        self._logger.info("Presiona cualquier tecla para cerrar...")
-        cv2.waitKey(0)
+        should_continue = True
+        key_code = cv2.waitKey(wait_ms if wait_ms > 0 else 0)
+        if quit_key and key_code != -1:
+            try:
+                pressed_key = chr(key_code & 0xFF).lower()
+                if pressed_key == quit_key.lower():
+                    should_continue = False
+            except ValueError:
+                pass
+
+        if close_on_exit:
+            cv2.destroyAllWindows()
+
+        return should_continue
+
+    def close_windows(self) -> None:
+        "Cierra todas las ventanas abiertas de OpenCV."
         cv2.destroyAllWindows()
