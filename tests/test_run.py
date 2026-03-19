@@ -50,6 +50,20 @@ def test_parse_args_accepts_camera_mode_and_resolution():
     assert args.frame_height == 720
 
 
+def test_parse_args_accepts_perf_debug_options():
+    args = parse_cli_args(["--perf_debug", "--perf_every=15"])
+
+    assert args.perf_debug is True
+    assert args.perf_every == 15
+
+
+def test_parse_args_accepts_image_source_stream_alias():
+    args = parse_cli_args(["--image_source=stream"])
+
+    assert args.image_source == "camera"
+    assert args.camera_mode == "stream"
+
+
 def test_load_config_defaults_to_file_source_and_index_zero():
     config = AppConfig.from_overrides()
 
@@ -60,6 +74,8 @@ def test_load_config_defaults_to_file_source_and_index_zero():
     assert config.camera_mode == "snapshot"
     assert config.frame_width is None
     assert config.frame_height is None
+    assert config.perf_debug is False
+    assert config.perf_every == 30
 
 
 def test_load_config_accepts_image_source_and_camera_index():

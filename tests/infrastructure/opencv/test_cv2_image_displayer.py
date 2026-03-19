@@ -29,7 +29,7 @@ def setup_cv2_mock(mock_cv2, shape=(100, 100, 3)):
     mock_cv2.FONT_HERSHEY_SIMPLEX = 0
     
     # Configure resize to return proper shape
-    def resize_side_effect(img, size):
+    def resize_side_effect(img, size, **_kwargs):
         return np.zeros((size[1], size[0], 3) if len(img.shape) == 3 else (size[1], size[0]), dtype=np.uint8)
     mock_cv2.resize.side_effect = resize_side_effect
 
@@ -404,3 +404,24 @@ class TestCV2ImageDisplayerGrid:
         
         mock_cv2.waitKey.assert_called_once_with(0)
         mock_cv2.destroyAllWindows.assert_called_once()
+
+    @patch('src.infrastructure.opencv.cv2_image_displayer.cv2')
+    @patch('src.infrastructure.opencv.cv2_image_displayer.get_logger')
+    def test_display_grid_scales_down_when_larger_than_screen(
+        self, mock_get_logger, mock_cv2, displayer, sample_rgb_image
+    ):
+        """Grid should be resized to fit within screen bounds."""
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+        setup_cv2_mock(mock_cv2)
+
+        with patch.object(displayer, "_get_screen_size", return_value=(120, 120)):
+            images = [
+                (sample_rgb_image, "A"),
+                (sample_rgb_image, "B"),
+                (sample_rgb_image, "C"),
+                (sample_rgb_image, "D"),
+            ]
+            displayer.display_grid(images, grid_size=(2, 2))
+
+        assert mock_cv2.resize.called

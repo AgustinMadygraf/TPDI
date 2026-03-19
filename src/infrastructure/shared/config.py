@@ -35,12 +35,33 @@ class AppConfigDefaults:
     camera_mode: str = CAMERA_MODE_CHOICES[0]  # "snapshot"
     frame_width: int | None = None
     frame_height: int | None = None
+    perf_debug: bool = False
+    perf_every: int = 30
 
 APP_CONFIG_DEFAULTS = AppConfigDefaults()
 
 DisplayerRegistry = dict[str, type[ImageDisplayPort]]
 
 def parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
+    normalized_argv = list(argv) if argv is not None else None
+    if normalized_argv is not None:
+        has_camera_mode = any(
+            token == "--camera_mode" or token.startswith("--camera_mode=")
+            for token in normalized_argv
+        )
+        for idx, token in enumerate(normalized_argv):
+            if token == "--image_source" and idx + 1 < len(normalized_argv):
+                if normalized_argv[idx + 1] == "stream":
+                    normalized_argv[idx + 1] = "camera"
+                    if not has_camera_mode:
+                        normalized_argv.extend(["--camera_mode", "stream"])
+                    break
+            elif token == "--image_source=stream":
+                normalized_argv[idx] = "--image_source=camera"
+                if not has_camera_mode:
+                    normalized_argv.append("--camera_mode=stream")
+                break
+
     parser = argparse.ArgumentParser(description="TPDI - Analisis de canales de color")
     parser.add_argument(
         "--mode",
@@ -112,7 +133,20 @@ def parse_cli_args(argv: list[str] | None = None) -> argparse.Namespace:
             f"(por defecto: {APP_CONFIG_DEFAULTS.grid})"
         ),
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--perf_debug",
+        action="store_true",
+        help="Habilita metricas de rendimiento en modo stream.",
+    )
+    parser.add_argument(
+        "--perf_every",
+        type=int,
+        help=(
+            "Cantidad de frames entre reportes de rendimiento "
+            f"(por defecto: {APP_CONFIG_DEFAULTS.perf_every})"
+        ),
+    )
+    return parser.parse_args(normalized_argv)
 
 
 @dataclass(frozen=True)
@@ -130,6 +164,8 @@ class AppConfig:
     camera_mode: str = APP_CONFIG_DEFAULTS.camera_mode
     frame_width: int | None = APP_CONFIG_DEFAULTS.frame_width
     frame_height: int | None = APP_CONFIG_DEFAULTS.frame_height
+    perf_debug: bool = APP_CONFIG_DEFAULTS.perf_debug
+    perf_every: int = APP_CONFIG_DEFAULTS.perf_every
 
     def __post_init__(self):
         # Validar que input_dir sea un Path valido.
@@ -175,6 +211,8 @@ class AppConfig:
             raise ValueError("frame_width invalido: debe ser > 0.")
         if self.frame_height is not None and self.frame_height <= 0:
             raise ValueError("frame_height invalido: debe ser > 0.")
+        if self.perf_every <= 0:
+            raise ValueError("perf_every invalido: debe ser > 0.")
 
     @classmethod
     def register_displayer(
@@ -235,6 +273,8 @@ class AppConfig:
         camera_mode: str = None,
         frame_width: int | None = None,
         frame_height: int | None = None,
+        perf_debug: bool | None = None,
+        perf_every: int | None = None,
     ) -> "AppConfig":
         kwargs = {}
         if gui_backend is not None:
@@ -259,6 +299,10 @@ class AppConfig:
             kwargs["frame_width"] = frame_width
         if frame_height is not None:
             kwargs["frame_height"] = frame_height
+        if perf_debug is not None:
+            kwargs["perf_debug"] = perf_debug
+        if perf_every is not None:
+            kwargs["perf_every"] = perf_every
 
         config = cls(**kwargs)
         if gui_displayers:

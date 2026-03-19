@@ -4,6 +4,7 @@ Path: src/infrastructure/cli/app.py
 
 from pathlib import Path
 import math
+import time
 from types import SimpleNamespace
 from typing import List
 
@@ -129,10 +130,27 @@ class CLIApp:
         print()
 
         processed_frames = 0
+        capture_ms_acc = 0.0
+        analysis_ms_acc = 0.0
+        render_ms_acc = 0.0
+        loop_ms_acc = 0.0
+        loop_window: list[float] = []
         try:
-            stream = self._gateway.get_video_stream(frame_interval=frame_interval)
-            for original in stream:
+            stream = iter(self._gateway.get_video_stream(frame_interval=frame_interval))
+            while True:
+                loop_start = time.perf_counter()
+                capture_start = time.perf_counter()
+                try:
+                    original = next(stream)
+                except StopIteration:
+                    break
+                capture_ms = (time.perf_counter() - capture_start) * 1000.0
+
+                analysis_start = time.perf_counter()
                 analysis = self._color_analyzer.execute(original, self._color_mode)
+                analysis_ms = (time.perf_counter() - analysis_start) * 1000.0
+
+                render_start = time.perf_counter()
                 should_continue = self._display_grid_2x4(
                     original,
                     analysis,
@@ -140,7 +158,27 @@ class CLIApp:
                     wait_ms=1,
                     close_on_exit=False,
                 )
+                render_ms = (time.perf_counter() - render_start) * 1000.0
+
+                loop_ms = (time.perf_counter() - loop_start) * 1000.0
                 processed_frames += 1
+                capture_ms_acc += capture_ms
+                analysis_ms_acc += analysis_ms
+                render_ms_acc += render_ms
+                loop_ms_acc += loop_ms
+                loop_window.append(loop_ms)
+
+                if self._config.perf_debug and processed_frames % self._config.perf_every == 0:
+                    self._print_perf_report(
+                        processed_frames=processed_frames,
+                        capture_ms_acc=capture_ms_acc,
+                        analysis_ms_acc=analysis_ms_acc,
+                        render_ms_acc=render_ms_acc,
+                        loop_ms_acc=loop_ms_acc,
+                        loop_window=loop_window,
+                    )
+                    loop_window.clear()
+
                 if not should_continue:
                     break
         except CameraUnavailableError as exc:
@@ -164,6 +202,41 @@ class CLIApp:
         print("Aplicacion finalizada.")
         print("=" * 60)
         return True
+
+    def _print_perf_report(
+        self,
+        processed_frames: int,
+        capture_ms_acc: float,
+        analysis_ms_acc: float,
+        render_ms_acc: float,
+        loop_ms_acc: float,
+        loop_window: list[float],
+    ) -> None:
+        """Imprime metricas agregadas de rendimiento para stream."""
+        if processed_frames <= 0:
+            return
+        avg_capture_ms = capture_ms_acc / processed_frames
+        avg_analysis_ms = analysis_ms_acc / processed_frames
+        avg_render_ms = render_ms_acc / processed_frames
+        avg_loop_ms = loop_ms_acc / processed_frames
+        effective_fps = 1000.0 / avg_loop_ms if avg_loop_ms > 0 else 0.0
+
+        p95_loop_ms = avg_loop_ms
+        if loop_window:
+            sorted_window = sorted(loop_window)
+            idx = max(0, math.ceil(len(sorted_window) * 0.95) - 1)
+            p95_loop_ms = sorted_window[idx]
+
+        print(
+            "[PERF] "
+            f"frames={processed_frames} "
+            f"avg_capture={avg_capture_ms:.2f}ms "
+            f"avg_analysis={avg_analysis_ms:.2f}ms "
+            f"avg_render={avg_render_ms:.2f}ms "
+            f"avg_loop={avg_loop_ms:.2f}ms "
+            f"p95_loop={p95_loop_ms:.2f}ms "
+            f"fps_efectivo={effective_fps:.2f}"
+        )
 
     def _print_camera_unavailable_help(self, exc: Exception) -> None:
         "Muestra un error de camara con pasos concretos para recuperarse."

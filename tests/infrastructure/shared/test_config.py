@@ -92,6 +92,13 @@ class TestAppConfig:
         assert config.frame_width == 1280
         assert config.frame_height == 720
 
+    def test_load_config_accepts_perf_debug_options(self):
+        """Performance debug options should be configurable."""
+        config = AppConfig.from_overrides(perf_debug=True, perf_every=12)
+
+        assert config.perf_debug is True
+        assert config.perf_every == 12
+
     def test_load_config_rejects_negative_camera_index(self):
         """Camera index must be zero or positive."""
         with pytest.raises(ValueError, match="camera_index invalido"):
@@ -118,6 +125,11 @@ class TestAppConfig:
             AppConfig.from_overrides(frame_width=0)
         with pytest.raises(ValueError, match="frame_height invalido"):
             AppConfig.from_overrides(frame_height=-1)
+
+    def test_load_config_rejects_invalid_perf_every(self):
+        """Perf report interval must be greater than zero."""
+        with pytest.raises(ValueError, match="perf_every invalido"):
+            AppConfig.from_overrides(perf_every=0)
 
 
 

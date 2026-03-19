@@ -26,6 +26,41 @@ class CV2ImageDisplayer(ImageDisplayPort):
             data = cv2.cvtColor(data, cv2.COLOR_RGB2BGR)
         return data
 
+    def _get_screen_size(self) -> tuple[int, int]:
+        """Retorna (ancho, alto) de pantalla con fallback seguro."""
+        try:
+            import tkinter as tk
+
+            root = tk.Tk()
+            root.withdraw()
+            width = int(root.winfo_screenwidth())
+            height = int(root.winfo_screenheight())
+            root.destroy()
+            if width > 0 and height > 0:
+                return width, height
+        except Exception:
+            pass
+        return (1920, 1080)
+
+    def _fit_image_to_screen(self, image, margin_ratio: float = 0.9):
+        """Escala la imagen para que no exceda la pantalla."""
+        screen_width, screen_height = self._get_screen_size()
+        max_width = int(screen_width * margin_ratio)
+        max_height = int(screen_height * margin_ratio)
+
+        height, width = image.shape[:2]
+        if width <= max_width and height <= max_height:
+            return image
+
+        scale = min(max_width / width, max_height / height)
+        target_width = max(1, int(width * scale))
+        target_height = max(1, int(height * scale))
+        return cv2.resize(
+            image,
+            (target_width, target_height),
+            interpolation=cv2.INTER_AREA,
+        )
+
     def display(
         self,
         image: Image,
@@ -163,6 +198,7 @@ class CV2ImageDisplayer(ImageDisplayPort):
 
         if grid_rows:
             grid_img = self._numpy_adapter.vstack(grid_rows)
+            grid_img = self._fit_image_to_screen(grid_img)
             cv2.imshow(title, grid_img)
             self._logger.info("Mostrando grid %dx%d: %s", rows, cols, title)
 

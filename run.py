@@ -24,6 +24,8 @@ class AppBootstrap:
         camera_mode: str | None = None,
         frame_width: int | None = None,
         frame_height: int | None = None,
+        perf_debug: bool | None = None,
+        perf_every: int | None = None,
     ):
         self._mode = mode
         self._log_level = log_level
@@ -36,6 +38,8 @@ class AppBootstrap:
         self._camera_mode = camera_mode
         self._frame_width = frame_width
         self._frame_height = frame_height
+        self._perf_debug = perf_debug
+        self._perf_every = perf_every
 
     def run(self) -> bool:
         config = AppConfig.from_overrides(
@@ -50,6 +54,8 @@ class AppBootstrap:
             camera_mode=self._camera_mode,
             frame_width=self._frame_width,
             frame_height=self._frame_height,
+            perf_debug=self._perf_debug,
+            perf_every=self._perf_every,
         )
 
         # Crear dependencias
@@ -85,19 +91,26 @@ class AppBootstrap:
 def main() -> None:
     """Punto de entrada principal de la aplicacion TPDI."""
     args = parse_cli_args()
-    success = AppBootstrap(
-        mode=args.mode,
-        log_level=args.log_level,
-        gui_backend=args.gui_backend,
-        input_dir=args.input_dir,
-        image_source=args.image_source,
-        camera_index=args.camera_index,
-        fps=args.fps,
-        grid=args.grid,
-        camera_mode=args.camera_mode,
-        frame_width=args.frame_width,
-        frame_height=args.frame_height,
-    ).run()
+    try:
+        success = AppBootstrap(
+            mode=args.mode,
+            log_level=args.log_level,
+            gui_backend=args.gui_backend,
+            input_dir=args.input_dir,
+            image_source=args.image_source,
+            camera_index=args.camera_index,
+            fps=args.fps,
+            grid=args.grid,
+            camera_mode=args.camera_mode,
+            frame_width=args.frame_width,
+            frame_height=args.frame_height,
+            perf_debug=args.perf_debug,
+            perf_every=args.perf_every,
+        ).run()
+    except KeyboardInterrupt:
+        print()
+        print("Interrumpido por usuario.")
+        raise SystemExit(130)
     raise SystemExit(0 if success else 1)
 
 if __name__ == "__main__":
