@@ -2,6 +2,22 @@
 Path: src/use_cases/color_separation.py
 """
 
+from typing import Protocol
+
+
+class CmykSeparationPolicy(Protocol):
+    """Contrato para conversion y visualizacion de canales CMYK."""
+
+    def rgb_to_cmyk(self, red: int, green: int, blue: int) -> tuple[int, int, int, int]:
+        ...
+
+    def channel_to_display_rgb(self, channel_index: int, intensity: int) -> tuple[int, int, int]:
+        ...
+
+    def cmyk_to_display_gray(self, cyan: int, magenta: int, yellow: int, black: int) -> int:
+        ...
+
+
 class GenericCmykSeparationPolicy:
     "Politica CMYK generica para analisis y simulacion de impresion."
     def __init__(

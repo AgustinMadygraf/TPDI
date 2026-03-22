@@ -409,3 +409,42 @@ Todas las tareas se clasificaron como **dudas de alto nivel** por impacto transv
 ### Estado final
 - `docs/todo.md`: vacio (sin tareas activas).
 - `docs/decisions/preguntas-arquitectura.md`: actualizado con preguntas activas pendientes.
+
+---
+
+## Cierre de Arquitectura Limpia - 2026-03-22 (`clean-architecture-closure-orchestrator`)
+
+### Secuencia ejecutada
+- `clean-architecture-audit`: ejecutado.
+- `solid-audit`: ejecutado.
+- Deduplicacion ARQ/SOLID: ejecutada (resultado canonico `[ARQ+SOLID]` en backlog operativo).
+- `decision-helper`: ejecutado (sin preguntas activas en `docs/decision/questions.md`).
+- `todo-workflow`: ejecutado via `decision-helper` para cierre operativo de certezas.
+- `skill-backend-testing`: ejecutado en loop de convergencia post-mejoras.
+- `docs-maintainer`: no ejecutado (no solicitado).
+
+### Iteraciones de arquitectura
+- Iteracion 1: 2 hallazgos criticos, 2 certezas nuevas, 0 dudas nuevas, estado `continuar`.
+- Iteracion 2: 0 hallazgos criticos, estado `detener` por criterio `sin criticos`.
+
+### Certezas cerradas
+- `[ARQ+SOLID]` Unificar contrato de politica CMYK:
+  - `src/use_cases/color_separation.py`: agregado protocolo canonico `CmykSeparationPolicy`.
+  - `src/use_cases/color_analysis.py`: eliminada implementacion/protocolo local duplicado y reutilizada politica canonica.
+- `[ARQ+SOLID]` Completar contrato de `ImageGateway.load`:
+  - `src/interface_adapters/gateways/image_gateway.py`: implementado `load()` y agregado fallback de `video_streamer` para compatibilidad de adaptador.
+
+### Loop de backend testing (post-ciclo)
+- Iteracion testing 1:
+  - Comando objetivo del skill no disponible por plugin ausente (`--reruns`, `--fail-on-flaky` no reconocidos).
+  - Fallback ejecutado: `pytest --junitxml=reports/backend-tests.xml`.
+  - Resultado: `FAIL`.
+  - Metricas: `tests_totales=240`, `tests_pasados=234`, `tests_fallidos_total=6`, `tests_fallidos_no_flaky=6` (aproximacion conservadora por falta de clasificacion flaky/no-flaky), `tests_fallidos_flaky=0`, `errores_infraestructura=no`.
+- Iteracion testing 2:
+  - Fallback ejecutado: `pytest --junitxml=reports/backend-tests.xml`.
+  - Resultado: `PASS`.
+  - Metricas (desde `reports/backend-tests.xml`): `tests_totales=240`, `tests_pasados=240`, `tests_fallidos_total=0`, `tests_fallidos_no_flaky=0`, `tests_fallidos_flaky=0`, `errores_infraestructura=no`.
+
+### Motivo de parada
+- Convergencia alcanzada: tests backend en `PASS` sin bloqueos criticos nuevos.
+- `docs/todo.md` quedo vacio tras el cierre operativo.
