@@ -39,3 +39,5 @@ data/
 Thumbs.db
 docs/decision/questions.md
 reports/backend-tests.xml
+
+.tmp/
