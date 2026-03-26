@@ -3,6 +3,7 @@
 from typing import List
 
 from src.entities.image import Image
+from src.infrastructure.settings.logger import get_logger
 from src.use_cases.color_analysis import ColorAnalysisResult, ColorMode
 from src.use_cases.color_separation import GenericCmykSeparationPolicy
 
@@ -17,22 +18,21 @@ class ColorAnalysisConsoleReporter:
     ) -> None:
         self._color_mode = color_mode
         self._cmyk_policy = cmyk_policy or GenericCmykSeparationPolicy()
+        self._logger = get_logger("tpdi.cli.analysis")
 
     def report(self, original: Image, analysis: ColorAnalysisResult) -> None:
-        print()
-        print("=" * 60)
-        print(analysis.debug_title)
-        print("=" * 60)
-        print(f"Imagen: {original.name}")
-        print(
-            f"Dimensiones: {original.width}x{original.height}, Canales: {original.channels}"
+        self._logger.info("=" * 60)
+        self._logger.info(analysis.debug_title)
+        self._logger.info("=" * 60)
+        self._logger.info("Imagen: %s", original.name)
+        self._logger.info(
+            "Dimensiones: %dx%d, Canales: %d", original.width, original.height, original.channels
         )
-        print(f"Total de bytes en data: {len(original.data)}")
-        print(f"Total de pixeles: {len(original.data) // original.channels}")
-        print()
+        self._logger.info("Total de bytes en data: %d", len(original.data))
+        self._logger.info("Total de pixeles: %d", len(original.data) // original.channels)
 
-        print("MUESTRA DE PIXELES DE LA IMAGEN ORIGINAL:")
-        print("-" * 60)
+        self._logger.info("MUESTRA DE PIXELES DE LA IMAGEN ORIGINAL:")
+        self._logger.info("-" * 60)
         sample_positions = [
             (0, 0, "Esquina superior izquierda"),
             (original.width // 2, original.height // 2, "Centro"),
@@ -53,26 +53,27 @@ class ColorAnalysisConsoleReporter:
                     analysis.channel_pixel_labels, converted_values, strict=False
                 )
             )
-            print(f"  ({x:4d},{y:4d}) {desc:30s} -> {values_text}")
+            self._logger.info("  (%4d,%4d) %-30s -> %s", x, y, desc, values_text)
 
-        print()
-        print("ESTADISTICAS GLOBALES DE LA ORIGINAL:")
-        print("-" * 60)
+        self._logger.info("ESTADISTICAS GLOBALES DE LA ORIGINAL:")
+        self._logger.info("-" * 60)
         channel_values = self._extract_channel_values_for_mode(original)
         for label, values in zip(analysis.channel_labels, channel_values, strict=False):
-            print(
-                f"  {label:15s} -> Min: {min(values):3d}, Max: {max(values):3d}, "
-                f"Promedio: {sum(values)/len(values):6.2f}"
+            self._logger.info(
+                "  %15s -> Min: %3d, Max: %3d, Promedio: %6.2f",
+                label,
+                min(values),
+                max(values),
+                sum(values) / len(values),
             )
-        print()
 
-        print("EXTRAYENDO CANALES DE LA IMAGEN ORIGINAL...")
-        print("-" * 60)
-        print("VERIFICACION DE EXTRACCION:")
-        print("-" * 60)
+        self._logger.info("EXTRAYENDO CANALES DE LA IMAGEN ORIGINAL...")
+        self._logger.info("-" * 60)
+        self._logger.info("VERIFICACION DE EXTRACCION:")
+        self._logger.info("-" * 60)
         channel_variant_count = len(analysis.channel_labels)
         for variant in analysis.variants[:channel_variant_count]:
-            print(
+            self._logger.info(
                 self._build_channel_verification_message(
                     original, variant.label, variant.image
                 )
@@ -88,15 +89,16 @@ class ColorAnalysisConsoleReporter:
             expected_gray = int(sum(original_values) / len(original_values))
             if self._color_mode == "CMYK":
                 expected_gray = 255 - expected_gray
-            print(
-                f"  Escala Gris: Pixel 0 -> "
-                f"R={gray_values[0]:3d}, G={gray_values[1]:3d}, B={gray_values[2]:3d} | "
-                f"Esperado: {expected_gray:3d} | "
-                f"OK: {gray_values == (expected_gray, expected_gray, expected_gray)}"
+            self._logger.info(
+                "  Escala Gris: Pixel 0 -> R=%3d, G=%3d, B=%3d | Esperado: %3d | OK: %s",
+                gray_values[0],
+                gray_values[1],
+                gray_values[2],
+                expected_gray,
+                gray_values == (expected_gray, expected_gray, expected_gray),
             )
 
-        print()
-        print("=" * 60)
+        self._logger.info("=" * 60)
 
     def _analyze_pixel(self, image: Image, x: int, y: int) -> tuple[int, ...]:
         idx = (y * image.width + x) * image.channels

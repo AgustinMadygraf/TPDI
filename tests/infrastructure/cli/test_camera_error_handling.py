@@ -11,7 +11,7 @@ from src.entities.image import Image
 
 def _build_app(
     image_source: str = "camera", camera_index: int = 0
-) -> tuple[CLIApp, MagicMock]:
+) -> tuple[CLIApp, MagicMock, MagicMock]:
     loader = MagicMock()
     displayer = MagicMock()
     gateway = MagicMock()
@@ -23,7 +23,8 @@ def _build_app(
 
     with patch("src.infrastructure.cli.app.setup_logging"):
         with patch("src.infrastructure.cli.app.get_logger") as get_logger:
-            get_logger.return_value = MagicMock()
+            logger = MagicMock()
+            get_logger.return_value = logger
             app = CLIApp(
                 loader=loader,
                 displayer=displayer,
@@ -33,37 +34,39 @@ def _build_app(
                 color_mode="RGB",
             )
 
-    return app, gateway
+    return app, gateway, logger
 
 
-def test_run_color_channel_analysis_handles_camera_unavailable_error(capsys):
-    app, gateway = _build_app(image_source="camera", camera_index=1)
+def test_run_color_channel_analysis_handles_camera_unavailable_error():
+    app, gateway, logger = _build_app(image_source="camera", camera_index=1)
     gateway.get_frame.side_effect = CameraUnavailableError("camara ocupada")
 
     result = app.run_color_channel_analysis()
-    captured = capsys.readouterr()
 
     assert result is False
-    assert "ERROR: No se pudo iniciar la camara." in captured.out
-    assert "camara ocupada" in captured.out
-    assert "--camera_index=1" in captured.out
+    logger.error.assert_any_call("No se pudo iniciar la camara.")
+    logger.error.assert_any_call("Detalle: %s", "camara ocupada")
+    logger.warning.assert_any_call(
+        "  2. Prueba otro indice: --image_source=camera --camera_index=1"
+    )
 
 
-def test_run_color_channel_analysis_handles_runtime_error_from_camera(capsys):
-    app, gateway = _build_app(image_source="camera", camera_index=2)
+def test_run_color_channel_analysis_handles_runtime_error_from_camera():
+    app, gateway, logger = _build_app(image_source="camera", camera_index=2)
     gateway.get_frame.side_effect = RuntimeError("fallo de backend de video")
 
     result = app.run_color_channel_analysis()
-    captured = capsys.readouterr()
 
     assert result is False
-    assert "ERROR: No se pudo iniciar la camara." in captured.out
-    assert "fallo de backend de video" in captured.out
-    assert "--image_source=file" in captured.out
+    logger.error.assert_any_call("No se pudo iniciar la camara.")
+    logger.error.assert_any_call("Detalle: %s", "fallo de backend de video")
+    logger.warning.assert_any_call(
+        "  3. Usa archivos: --image_source=file --input_dir=data/input"
+    )
 
 
 def test_run_color_channel_analysis_stream_uses_video_stream():
-    app, gateway = _build_app(image_source="camera", camera_index=0)
+    app, gateway, _logger = _build_app(image_source="camera", camera_index=0)
     app._config = AppConfig.from_overrides(
         image_source="camera",
         camera_mode="stream",

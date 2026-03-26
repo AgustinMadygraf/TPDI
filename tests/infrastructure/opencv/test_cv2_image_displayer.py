@@ -406,6 +406,17 @@ class TestCV2ImageDisplayerGrid:
         mock_cv2.destroyAllWindows.assert_called_once()
 
     @patch('src.infrastructure.opencv.cv2_image_displayer.cv2')
+    def test_display_grid_returns_false_on_escape_key(self, mock_cv2, displayer, sample_rgb_image):
+        """ESC should stop stream loop."""
+        setup_cv2_mock(mock_cv2)
+        mock_cv2.waitKey.return_value = 27
+
+        images = [(sample_rgb_image, "Test")]
+        should_continue = displayer.display_grid(images, grid_size=(1, 1), wait_ms=10, close_on_exit=False, quit_key="q")
+
+        assert should_continue is False
+
+    @patch('src.infrastructure.opencv.cv2_image_displayer.cv2')
     @patch('src.infrastructure.opencv.cv2_image_displayer.get_logger')
     def test_display_grid_scales_down_when_larger_than_screen(
         self, mock_get_logger, mock_cv2, displayer, sample_rgb_image

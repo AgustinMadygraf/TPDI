@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from src.entities.image import Image
-from src.infrastructure.cli.app import CLIApp
+from src.infrastructure.cli.app import CLIApp, _resolve_camera_mode
 from src.use_cases.color_analysis import ColorAnalysisResult, ColorAnalysisVariant
 
 
@@ -402,3 +402,29 @@ class TestCLIAppStandardRun:
         
         mock_displayer.display.assert_called_once_with(sample_image)
         app.logger.info.assert_any_call("Mostrando imagen: %s", "test.png")
+
+
+def test_resolve_camera_mode_returns_cli_value_when_present():
+    result = _resolve_camera_mode("camera", "stream")
+
+    assert result == "stream"
+
+
+def test_resolve_camera_mode_prompts_and_accepts_stream_choice():
+    with patch("src.infrastructure.cli.app.sys.stdin.isatty", return_value=True):
+        with patch("src.infrastructure.cli.app.get_logger") as mock_get_logger:
+            logger = MagicMock()
+            mock_get_logger.return_value = logger
+            with patch("builtins.input", side_effect=["x", "2"]):
+                result = _resolve_camera_mode("camera", None)
+
+    assert result == "stream"
+    logger.warning.assert_called_with("Entrada invalida. Escribe 1 o 2.")
+
+
+def test_resolve_camera_mode_non_camera_does_not_prompt():
+    with patch("builtins.input") as mock_input:
+        result = _resolve_camera_mode("file", None)
+
+    assert result is None
+    mock_input.assert_not_called()

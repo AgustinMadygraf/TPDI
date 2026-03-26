@@ -47,7 +47,7 @@ class CLIApp:
         color_mode: ColorMode = "RGB",
     ):
         setup_logging(name="tpdi")
-        self._logger = get_logger(__name__)
+        self._logger = get_logger("tpdi.cli")
         self._displayer = displayer
         self._loader = loader
         self._gateway = gateway or SimpleNamespace(
@@ -81,6 +81,9 @@ class CLIApp:
     def run_color_channel_analysis(self) -> bool:
         "Ejecuta analisis de canales de color con layout segun modo."
         self._print_analysis_header()
+        self._logger.info("Fuente de imagen activa: %s", self._config.image_source)
+        if self._config.image_source == "camera":
+            self._logger.info("Modo de camara activo: %s", self._config.camera_mode)
 
         if self._config.image_source == "camera" and self._config.camera_mode == "stream":
             return self._run_camera_stream_analysis()
@@ -89,26 +92,22 @@ class CLIApp:
         if original is None:
             return False
 
-        print()
         analysis = self._process_color_variants(original)
 
-        print()
         self._display_grid_2x4(original, analysis)
 
         self._print_app_finished()
         return True
 
     def _print_analysis_header(self) -> None:
-        print("=" * 60)
-        print("TPDI - Analisis de Canales de Color")
-        print("=" * 60)
-        print()
+        self._logger.info("=" * 60)
+        self._logger.info("TPDI - Analisis de Canales de Color")
+        self._logger.info("=" * 60)
 
     def _print_app_finished(self) -> None:
-        print()
-        print("=" * 60)
-        print("Aplicacion finalizada.")
-        print("=" * 60)
+        self._logger.info("=" * 60)
+        self._logger.info("Aplicacion finalizada.")
+        self._logger.info("=" * 60)
 
     def _load_original_image_for_analysis(self) -> Image | None:
         if self._config.image_source == "camera":
@@ -116,7 +115,7 @@ class CLIApp:
         return self._load_original_from_files()
 
     def _load_original_from_camera(self) -> Image | None:
-        print(
+        self._logger.info(
             "Capturando imagen desde camara... "
             f"(indice: {self._config.camera_index})"
         )
@@ -127,39 +126,37 @@ class CLIApp:
             return None
 
         if original is None:
-            print("ERROR: No se pudo capturar imagen de la camara.")
+            self._logger.error("No se pudo capturar imagen de la camara.")
             return None
 
-        print(f"Imagen capturada: {original.name}")
-        print(f"  Dimensiones: {original.width}x{original.height}")
-        print(f"  Canales: {original.channels}")
+        self._logger.info("Imagen capturada: %s", original.name)
+        self._logger.info("  Dimensiones: %dx%d", original.width, original.height)
+        self._logger.info("  Canales: %d", original.channels)
         return original
 
     def _load_original_from_files(self) -> Image | None:
-        print(f"Cargando imagenes desde: {self._base_path}")
+        self._logger.info("Cargando imagenes desde: %s", self._base_path)
         images = self.load_images()
         if not images:
-            print(f"ERROR: No se encontraron imagenes en: {self._base_path}")
-            print("Agrega imagenes PNG/JPG a la carpeta data/input/")
-            print()
+            self._logger.error("No se encontraron imagenes en: %s", self._base_path)
+            self._logger.warning("Agrega imagenes PNG/JPG a la carpeta data/input/")
             return None
 
-        print(f"Cargadas {len(images)} imagen(es)")
+        self._logger.info("Cargadas %d imagen(es)", len(images))
         original = images[0]
-        print(f"Imagen seleccionada: {original.name}")
-        print(f"  Dimensiones: {original.width}x{original.height}")
-        print(f"  Canales: {original.channels}")
+        self._logger.info("Imagen seleccionada: %s", original.name)
+        self._logger.info("  Dimensiones: %dx%d", original.width, original.height)
+        self._logger.info("  Canales: %d", original.channels)
         return original
 
     def _run_camera_stream_analysis(self) -> bool:
         """Ejecuta analisis continuo desde camara hasta que el usuario presione 'q'."""
         frame_interval = 1.0 / self._config.fps
-        print(
+        self._logger.info(
             "Iniciando stream de camara... "
             f"(indice: {self._config.camera_index}, fps_objetivo: {self._config.fps:.2f})"
         )
-        print("Presiona 'q' en la ventana para salir del stream.")
-        print()
+        self._logger.info("Presiona 'q' en la ventana para salir del stream.")
 
         processed_frames = 0
         capture_ms_acc = 0.0
@@ -179,7 +176,14 @@ class CLIApp:
                 capture_ms = (time.perf_counter() - capture_start) * 1000.0
 
                 analysis_start = time.perf_counter()
-                analysis = self._color_analyzer.execute(original, self._color_mode)
+                include_grayscale_variant = not (
+                    self._color_mode == "CMYK" and self._config.grid == "2x2"
+                )
+                analysis = self._color_analyzer.execute(
+                    original,
+                    self._color_mode,
+                    include_grayscale_variant=include_grayscale_variant,
+                )
                 analysis_ms = (time.perf_counter() - analysis_start) * 1000.0
 
                 render_start = time.perf_counter()
@@ -187,7 +191,7 @@ class CLIApp:
                     original,
                     analysis,
                     show_console_output=False,
-                    wait_ms=1,
+                    wait_ms=10,
                     close_on_exit=False,
                 )
                 render_ms = (time.perf_counter() - render_start) * 1000.0
@@ -222,10 +226,10 @@ class CLIApp:
                 close_windows()
 
         if processed_frames == 0:
-            print("ERROR: No se pudo capturar imagen de la camara.")
+            self._logger.error("No se pudo capturar imagen de la camara.")
             return False
 
-        print(f"Stream finalizado. Frames procesados: {processed_frames}")
+        self._logger.info("Stream finalizado. Frames procesados: %d", processed_frames)
         self._print_app_finished()
         return True
 
@@ -253,7 +257,7 @@ class CLIApp:
             idx = max(0, math.ceil(len(sorted_window) * 0.95) - 1)
             p95_loop_ms = sorted_window[idx]
 
-        print(
+        self._logger.info(
             "[PERF] "
             f"frames={processed_frames} "
             f"avg_capture={avg_capture_ms:.2f}ms "
@@ -266,14 +270,12 @@ class CLIApp:
 
     def _print_camera_unavailable_help(self, exc: Exception) -> None:
         "Muestra un error de camara con pasos concretos para recuperarse."
-        self._logger.error("Error de camara: %s", exc)
-        print("ERROR: No se pudo iniciar la camara.")
-        print(f"Detalle: {exc}")
-        print("Sugerencias:")
-        print("  1. Verifica que la camara este conectada y libre.")
-        print("  2. Prueba otro indice: --image_source=camera --camera_index=1")
-        print("  3. Usa archivos: --image_source=file --input_dir=data/input")
-        print()
+        self._logger.error("No se pudo iniciar la camara.")
+        self._logger.error("Detalle: %s", str(exc))
+        self._logger.warning("Sugerencias:")
+        self._logger.warning("  1. Verifica que la camara este conectada y libre.")
+        self._logger.warning("  2. Prueba otro indice: --image_source=camera --camera_index=1")
+        self._logger.warning("  3. Usa archivos: --image_source=file --input_dir=data/input")
     def _process_color_variants(self, original: Image) -> ColorAnalysisResult:
         "Construye el analisis configurable y muestra depuracion en consola."
         analysis = self._color_analyzer.execute(original, self._color_mode)
@@ -296,15 +298,13 @@ class CLIApp:
         )
 
         if show_console_output:
-            print(f"Mostrando grid de analisis {presentation.layout_label}:")
+            self._logger.info("Mostrando grid de analisis %s:", presentation.layout_label)
             for idx, row_items in enumerate(presentation.row_labels):
                 if row_items:
-                    print(f"  [FILA {idx + 1}] " + " | ".join(row_items))
+                    self._logger.info("  [FILA %d] %s", idx + 1, " | ".join(row_items))
 
         if show_console_output:
-            print()
-            print("Presiona cualquier tecla en la ventana para cerrar...")
-            print()
+            self._logger.info("Presiona cualquier tecla en la ventana para cerrar...")
 
         display_result = self._displayer.display_grid(
             images=presentation.images,
@@ -387,10 +387,20 @@ def bootstrap_and_run_color_channel_analysis(
     path_validator = PathValidator(base_path=config.input_dir)
     loader = CV2ImageLoader(path_validator=path_validator)
     displayer = config.create_displayer()
+    frame_width = config.frame_width
+    frame_height = config.frame_height
+    if config.image_source == "camera" and config.camera_mode == "stream":
+        if frame_width is None and frame_height is None:
+            frame_width = 320
+            frame_height = 240
+            get_logger("tpdi.cli").info(
+                "Stream sin resolucion explicita; usando 320x240 para mejorar FPS. "
+                "Override: --frame_width --frame_height"
+            )
     video_loader = CV2VideoLoader(
         camera_index=config.camera_index,
-        frame_width=config.frame_width,
-        frame_height=config.frame_height,
+        frame_width=frame_width,
+        frame_height=frame_height,
     )
     gateway = ImageGateway(
         loader=loader,
@@ -417,23 +427,51 @@ def _resolve_image_source(cli_value: str | None) -> str | None:
     if not sys.stdin.isatty():
         return None
 
-    print()
-    print("Selecciona la fuente de imagen:")
-    print("  1) Imagen estatica (archivo)")
-    print("  2) Camara web")
+    logger = get_logger("tpdi.cli")
+    logger.info("Selecciona la fuente de imagen:")
+    logger.info("  1) Imagen estatica (archivo)")
+    logger.info("  2) Camara web")
     while True:
         choice = input("Opcion [1/2, Enter=1]: ").strip()
         if choice in {"", "1"}:
             return "file"
         if choice == "2":
             return "camera"
-        print("Entrada invalida. Escribe 1 o 2.")
+        logger.warning("Entrada invalida. Escribe 1 o 2.")
+
+
+def _resolve_camera_mode(
+    image_source: str | None, cli_value: str | None
+) -> str | None:
+    """Resuelve el modo de camara desde CLI o selector interactivo."""
+    if image_source != "camera":
+        return cli_value
+
+    if cli_value in {"snapshot", "stream"}:
+        return cli_value
+
+    if not sys.stdin.isatty():
+        return None
+
+    logger = get_logger("tpdi.cli")
+    logger.info("Selecciona el modo de camara:")
+    logger.info("  1) Captura unica (snapshot)")
+    logger.info("  2) Stream continuo")
+    while True:
+        choice = input("Modo [1/2, Enter=1]: ").strip()
+        if choice in {"", "1"}:
+            return "snapshot"
+        if choice == "2":
+            return "stream"
+        logger.warning("Entrada invalida. Escribe 1 o 2.")
 
 
 def main() -> None:
     """Punto de entrada principal de la aplicacion TPDI."""
+    setup_logging(name="tpdi")
     args = parse_cli_args()
     image_source = _resolve_image_source(args.image_source)
+    camera_mode = _resolve_camera_mode(image_source, args.camera_mode)
     try:
         success = bootstrap_and_run_color_channel_analysis(
             mode=args.mode,
@@ -444,14 +482,13 @@ def main() -> None:
             camera_index=args.camera_index,
             fps=args.fps,
             grid=args.grid,
-            camera_mode=args.camera_mode,
+            camera_mode=camera_mode,
             frame_width=args.frame_width,
             frame_height=args.frame_height,
             perf_debug=args.perf_debug,
             perf_every=args.perf_every,
         )
     except KeyboardInterrupt as exc:
-        print()
-        print("Interrumpido por usuario.")
+        get_logger("tpdi.cli").warning("Interrumpido por usuario.")
         raise SystemExit(130) from exc
     raise SystemExit(0 if success else 1)

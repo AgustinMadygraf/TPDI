@@ -2,7 +2,6 @@
 Path: src/infrastructure/opencv/cv2_video_loader.py
 """
 
-import time
 from typing import Iterator
 
 import cv2
@@ -27,6 +26,7 @@ class CV2VideoLoader(VideoStreamPort):
         self._frame_height = frame_height
 
     def get_video_stream(self, frame_interval: float = 0.1) -> Iterator[Image]:
+        _ = frame_interval  # Mantiene compatibilidad del contrato del puerto.
         cap = cv2.VideoCapture(self._camera_index)
         if not cap.isOpened():
             cap.release()
@@ -45,7 +45,6 @@ class CV2VideoLoader(VideoStreamPort):
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 img = self._build_image(frame_rgb)
                 yield img
-                time.sleep(frame_interval)
         finally:
             cap.release()
 

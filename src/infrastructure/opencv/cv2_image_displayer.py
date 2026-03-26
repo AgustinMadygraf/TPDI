@@ -190,13 +190,23 @@ class CV2ImageDisplayer(ImageDisplayPort):
             grid_img = self._fit_image_to_screen(grid_img)
             cv2.imshow(title, grid_img)
             self._logger.info("Mostrando grid %dx%d: %s", rows, cols, title)
+            get_window_property = getattr(cv2, "getWindowProperty", None)
+            if callable(get_window_property) and hasattr(cv2, "WND_PROP_VISIBLE"):
+                try:
+                    visibility = get_window_property(title, cv2.WND_PROP_VISIBLE)
+                    if isinstance(visibility, (int, float)) and visibility < 1:
+                        return False
+                except (AttributeError, TypeError, ValueError):
+                    pass
 
         should_continue = True
-        key_code = cv2.waitKey(wait_ms if wait_ms > 0 else 0)
+        wait_duration = wait_ms if wait_ms > 0 else 0
+        key_code = cv2.waitKey(wait_duration)
         if quit_key and key_code != -1:
             try:
-                pressed_key = chr(key_code & 0xFF).lower()
-                if pressed_key == quit_key.lower():
+                normalized_key = key_code & 0xFF
+                pressed_key = chr(normalized_key).lower()
+                if pressed_key == quit_key.lower() or normalized_key == 27:
                     should_continue = False
             except ValueError:
                 pass

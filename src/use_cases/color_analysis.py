@@ -52,7 +52,10 @@ class ColorChannelAnalyzer:
         self._cmyk_policy = cmyk_policy or GenericCmykSeparationPolicy()
 
     def execute(
-        self, image: Image, color_mode: ColorMode
+        self,
+        image: Image,
+        color_mode: ColorMode,
+        include_grayscale_variant: bool = True,
     ) -> ColorAnalysisResult:
         """Genera variantes y metadatos de analisis para el modo indicado."""
         if image.channels == 1:
@@ -69,7 +72,9 @@ class ColorChannelAnalyzer:
         if color_mode == "CMY":
             return self._build_cmy_analysis(image)
         if color_mode == "CMYK":
-            return self._build_cmyk_analysis(image)
+            return self._build_cmyk_analysis(
+                image, include_grayscale_variant=include_grayscale_variant
+            )
 
         return self._build_rgb_analysis(image)
 
@@ -125,7 +130,9 @@ class ColorChannelAnalyzer:
             ],
         )
 
-    def _build_cmyk_analysis(self, image: Image) -> ColorAnalysisResult:
+    def _build_cmyk_analysis(
+        self, image: Image, include_grayscale_variant: bool = True
+    ) -> ColorAnalysisResult:
         cmyk_values = [
             self._cmyk_policy.rgb_to_cmyk(
                 image.data[i], image.data[i + 1], image.data[i + 2]
@@ -145,7 +152,15 @@ class ColorChannelAnalyzer:
         black_channel = self._build_cmyk_visible_channel_image(
             image, cmyk_values, 3, "black_channel"
         )
-        full_grayscale = self._build_cmyk_full_grayscale(image, cmyk_values)
+        variants = [
+            ColorAnalysisVariant("CANAL CIAN", cyan_channel),
+            ColorAnalysisVariant("CANAL MAGENTA", magenta_channel),
+            ColorAnalysisVariant("CANAL AMARILLO", yellow_channel),
+            ColorAnalysisVariant("CANAL NEGRO", black_channel),
+        ]
+        if include_grayscale_variant:
+            full_grayscale = self._build_cmyk_full_grayscale(image, cmyk_values)
+            variants.append(ColorAnalysisVariant("ESCALA DE GRISES", full_grayscale))
 
         return ColorAnalysisResult(
             mode="CMYK",
@@ -158,13 +173,7 @@ class ColorChannelAnalyzer:
             ),
             channel_pixel_labels=("Cian", "Magenta", "Amarillo", "Negro"),
             analysis_title=f"Analisis CMYK: {image.name}",
-            variants=[
-                ColorAnalysisVariant("CANAL CIAN", cyan_channel),
-                ColorAnalysisVariant("CANAL MAGENTA", magenta_channel),
-                ColorAnalysisVariant("CANAL AMARILLO", yellow_channel),
-                ColorAnalysisVariant("CANAL NEGRO", black_channel),
-                ColorAnalysisVariant("ESCALA DE GRISES", full_grayscale),
-            ],
+            variants=variants,
         )
 
     def _apply_cmy_grayscale(self, image: Image) -> Image:

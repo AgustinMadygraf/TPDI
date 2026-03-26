@@ -161,3 +161,25 @@ class TestColorChannelAnalyzer:
         assert result.variants[2].image.data == [2, 30, 255]
         assert result.variants[3].image.data == [3, 40, 255]
         assert result.variants[4].image.data == [123, 123, 123]
+
+    def test_execute_cmyk_can_skip_grayscale_variant(self):
+        """CMYK can skip grayscale variant for faster realtime preview."""
+        analyzer = ColorChannelAnalyzer()
+        image = Image(
+            name="test.png",
+            width=1,
+            height=1,
+            channels=3,
+            data=[10, 20, 30],
+            path="/tmp/test.png",
+        )
+
+        result = analyzer.execute(image, "CMYK", include_grayscale_variant=False)
+
+        assert len(result.variants) == 4
+        assert [variant.label for variant in result.variants] == [
+            "CANAL CIAN",
+            "CANAL MAGENTA",
+            "CANAL AMARILLO",
+            "CANAL NEGRO",
+        ]
