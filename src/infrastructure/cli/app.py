@@ -4,25 +4,32 @@ Path: src/infrastructure/cli/app.py
 
 from pathlib import Path
 import math
+import sys
 import time
 from types import SimpleNamespace
 from typing import List
 
 from src.entities.image import Image
-from src.infrastructure.opencv.cv2_video_loader import CameraUnavailableError
-from src.infrastructure.shared.logger import setup_logging, get_logger
+from src.infrastructure.opencv.cv2_image_loader import CV2ImageLoader
+from src.infrastructure.opencv.cv2_video_loader import (
+    CV2VideoLoader,
+    CameraUnavailableError,
+)
+from src.infrastructure.settings.path_validator import PathValidator
+from src.infrastructure.settings.logger import setup_logging, get_logger
 from src.use_cases.color_analysis import (
     ColorAnalysisResult,
     ColorChannelAnalyzer,
     ColorMode,
 )
 from src.use_cases.color_separation import GenericCmykSeparationPolicy
-from src.interface_adapters.controllers.main_controller import MainController
 from src.use_cases.display_image import ImageDisplayPort
 from src.use_cases.load_images import ImageLoaderPort, LoadImagesFromDirectory
 
 from src.interface_adapters.gateways.image_gateway import ImageGateway
-from src.infrastructure.shared.config import AppConfig
+from src.infrastructure.settings.config import AppConfig, parse_cli_args
+
+DEFAULT_INPUT_DIR = Path("data/input")
 
 
 class CLIApp:
@@ -48,7 +55,7 @@ class CLIApp:
         self._config = config or AppConfig.from_overrides(
             color_mode=color_mode
         )
-        self._base_path = base_path or MainController.DEFAULT_INPUT_DIR
+        self._base_path = base_path or DEFAULT_INPUT_DIR
         self._color_mode = color_mode
         self._cmyk_policy = GenericCmykSeparationPolicy()
         self._color_analyzer = ColorChannelAnalyzer(
@@ -561,8 +568,109 @@ class CLIApp:
         self._logger.info("Mostrando imagen: %s", image.name)
         self._displayer.display(image)
 
-    def _display_comparison(self, original: Image, modified: Image) -> None:
-        """Muestra comparación lado a lado de dos imágenes."""
-        self._logger.info("Mostrando comparacion: %s", original.name)
-        self._displayer.display(original, modified)
+
+def bootstrap_and_run_color_channel_analysis(
+    *,
+    mode: str | None = None,
+    log_level: str | None = None,
+    gui_backend: str | None = None,
+    input_dir: str | None = None,
+    image_source: str | None = None,
+    camera_index: int | None = None,
+    fps: float | None = None,
+    grid: str | None = None,
+    camera_mode: str | None = None,
+    frame_width: int | None = None,
+    frame_height: int | None = None,
+    perf_debug: bool | None = None,
+    perf_every: int | None = None,
+) -> bool:
+    """Construye dependencias y ejecuta el flujo principal de analisis."""
+    config = AppConfig.from_overrides(
+        color_mode=mode,
+        log_level=log_level,
+        gui_backend=gui_backend,
+        input_dir=input_dir,
+        image_source=image_source,
+        camera_index=camera_index,
+        fps=fps,
+        grid=grid,
+        camera_mode=camera_mode,
+        frame_width=frame_width,
+        frame_height=frame_height,
+        perf_debug=perf_debug,
+        perf_every=perf_every,
+    )
+
+    path_validator = PathValidator(base_path=config.input_dir)
+    loader = CV2ImageLoader(path_validator=path_validator)
+    displayer = config.create_displayer()
+    video_loader = CV2VideoLoader(
+        camera_index=config.camera_index,
+        frame_width=config.frame_width,
+        frame_height=config.frame_height,
+    )
+    gateway = ImageGateway(
+        loader=loader,
+        video_streamer=video_loader,
+        base_path=config.input_dir,
+    )
+
+    app = CLIApp(
+        loader=loader,
+        displayer=displayer,
+        gateway=gateway,
+        config=config,
+        base_path=config.input_dir,
+        color_mode=config.color_mode,
+    )
+    return app.run_color_channel_analysis()
+
+
+def _resolve_image_source(cli_value: str | None) -> str | None:
+    """Resuelve la fuente de imagen desde CLI o con selector interactivo."""
+    if cli_value in {"file", "camera"}:
+        return cli_value
+
+    if not sys.stdin.isatty():
+        return None
+
+    print()
+    print("Selecciona la fuente de imagen:")
+    print("  1) Imagen estatica (archivo)")
+    print("  2) Camara web")
+    while True:
+        choice = input("Opcion [1/2, Enter=1]: ").strip()
+        if choice in {"", "1"}:
+            return "file"
+        if choice == "2":
+            return "camera"
+        print("Entrada invalida. Escribe 1 o 2.")
+
+
+def main() -> None:
+    """Punto de entrada principal de la aplicacion TPDI."""
+    args = parse_cli_args()
+    image_source = _resolve_image_source(args.image_source)
+    try:
+        success = bootstrap_and_run_color_channel_analysis(
+            mode=args.mode,
+            log_level=args.log_level,
+            gui_backend=args.gui_backend,
+            input_dir=args.input_dir,
+            image_source=image_source,
+            camera_index=args.camera_index,
+            fps=args.fps,
+            grid=args.grid,
+            camera_mode=args.camera_mode,
+            frame_width=args.frame_width,
+            frame_height=args.frame_height,
+            perf_debug=args.perf_debug,
+            perf_every=args.perf_every,
+        )
+    except KeyboardInterrupt as exc:
+        print()
+        print("Interrumpido por usuario.")
+        raise SystemExit(130) from exc
+    raise SystemExit(0 if success else 1)
 

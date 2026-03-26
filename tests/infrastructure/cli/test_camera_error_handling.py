@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from src.infrastructure.cli.app import CLIApp
 from src.infrastructure.opencv.cv2_video_loader import CameraUnavailableError
-from src.infrastructure.shared.config import AppConfig
+from src.infrastructure.settings.config import AppConfig
 from src.entities.image import Image
 
 

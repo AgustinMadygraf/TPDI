@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.infrastructure.shared.config import AppConfig
+from src.infrastructure.settings.config import AppConfig
 
 
 class DummyDisplayer:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.infrastructure.shared.path_validator import PathValidator
+from src.infrastructure.settings.path_validator import PathValidator
 
 
 class TestPathValidator:

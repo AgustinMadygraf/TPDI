@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.infrastructure.shared.logger import (
+from src.infrastructure.settings.logger import (
     FastAPIFormatter,
     get_logger,
     setup_logging,

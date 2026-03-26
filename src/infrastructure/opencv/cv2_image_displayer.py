@@ -5,7 +5,7 @@ Path: src/infrastructure/opencv/cv2_image_displayer.py
 from typing import List, Optional, Tuple
 import cv2
 from src.infrastructure.numpy.image_adapter import NumPyImageAdapter
-from src.infrastructure.shared.logger import get_logger
+from src.infrastructure.settings.logger import get_logger
 from src.use_cases.display_image import ImageDisplayPort
 from src.entities.image import Image
 

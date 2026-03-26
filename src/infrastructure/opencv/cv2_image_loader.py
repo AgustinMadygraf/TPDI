@@ -5,7 +5,7 @@ Path: src/infrastructure/opencv/cv2_image_loader.py
 from pathlib import Path
 import cv2
 from src.infrastructure.numpy.image_adapter import NumPyImageAdapter
-from src.infrastructure.shared.path_validator import PathValidator
+from src.infrastructure.settings.path_validator import PathValidator
 from src.use_cases.load_images import ImageLoaderPort
 from src.entities.image import Image
 

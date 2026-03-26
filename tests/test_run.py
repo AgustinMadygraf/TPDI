@@ -1,6 +1,6 @@
 """Tests for run.py CLI argument parsing and config fallback behavior."""
 
-from src.infrastructure.shared.config import AppConfig, parse_cli_args
+from src.infrastructure.settings.config import AppConfig, parse_cli_args
 
 
 def test_parse_args_accepts_mode_cmy():

@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from src.infrastructure.opencv.cv2_image_loader import CV2ImageLoader
-from src.infrastructure.shared.path_validator import PathValidator
+from src.infrastructure.settings.path_validator import PathValidator
 
 
 class TestCV2ImageLoader:
@@ -28,9 +28,9 @@ class TestCV2ImageLoader:
         img_path = temp_directory / "test_rgb.png"
         img_data = np.random.randint(0, 256, (100, 100, 3), dtype=np.uint8)
         cv2.imwrite(str(img_path), img_data)
-        
+
         result = loader.load(img_path)
-        
+
         assert result.name == "test_rgb.png"
         assert result.width == 100
         assert result.height == 100
@@ -42,9 +42,9 @@ class TestCV2ImageLoader:
         img_path = temp_directory / "test_gray.png"
         img_data = np.random.randint(0, 256, (50, 80), dtype=np.uint8)
         cv2.imwrite(str(img_path), img_data)
-        
+
         result = loader.load(img_path)
-        
+
         assert result.name == "test_gray.png"
         assert result.width == 80
         assert result.height == 50
@@ -57,9 +57,9 @@ class TestCV2ImageLoader:
         # Create RGBA image with explicit alpha channel
         img_data = np.random.randint(0, 256, (100, 100, 4), dtype=np.uint8)
         cv2.imwrite(str(img_path), img_data)
-        
+
         result = loader.load(img_path)
-        
+
         assert result.channels == 3
         assert len(result.data) == 100 * 100 * 3
 
@@ -85,7 +85,7 @@ class TestCV2ImageLoader:
         """Test loading an invalid image file raises ValueError."""
         invalid_file = temp_directory / "not_an_image.txt"
         invalid_file.write_text("This is not an image")
-        
+
         with pytest.raises(ValueError, match="No se pudo cargar la imagen"):
             loader.load(invalid_file)
 
@@ -99,9 +99,9 @@ class TestCV2ImageLoader:
         img_path = temp_directory / "test.png"
         img_data = np.zeros((10, 10, 3), dtype=np.uint8)
         cv2.imwrite(str(img_path), img_data)
-        
+
         result = loader.load(img_path)
-        
+
         assert result.path == str(img_path.resolve())
 
     def test_load_preserves_image_data(self, temp_directory, loader):
@@ -110,9 +110,9 @@ class TestCV2ImageLoader:
         # Create image with known values
         img_data = np.full((10, 10, 3), [255, 128, 64], dtype=np.uint8)
         cv2.imwrite(str(img_path), img_data)
-        
+
         result = loader.load(img_path)
-        
+
         # Check that data is present (exact values depend on compression)
         assert len(result.data) == 10 * 10 * 3
         assert all(isinstance(v, int) for v in result.data)
@@ -124,9 +124,9 @@ class TestCV2ImageLoader:
         img_data = np.zeros((10, 10, 3), dtype=np.uint8)
         img_data[:, :] = [0, 0, 255]  # BGR red
         cv2.imwrite(str(img_path), img_data)
-        
+
         result = loader.load(img_path)
-        
+
         # Check first pixel - should be RGB (255, 0, 0)
         first_pixel = result.data[:3]
         assert first_pixel == [255, 0, 0]  # RGB red
@@ -144,30 +144,30 @@ class TestCV2ImageLoaderPerformance:
     def test_load_small_image_performance(self, temp_directory, loader):
         """Test loading a small image is fast."""
         import time
-        
+
         img_path = temp_directory / "small.png"
         img_data = np.random.randint(0, 256, (100, 100, 3), dtype=np.uint8)
         cv2.imwrite(str(img_path), img_data)
-        
+
         start = time.time()
         result = loader.load(img_path)
         elapsed = time.time() - start
-        
+
         assert elapsed < 0.5  # Should load in less than 500ms
         assert result is not None
 
     def test_load_large_image_performance(self, temp_directory, loader):
         """Test loading a large image."""
         import time
-        
+
         img_path = temp_directory / "large.png"
         img_data = np.random.randint(0, 256, (2000, 2000, 3), dtype=np.uint8)
         cv2.imwrite(str(img_path), img_data)
-        
+
         start = time.time()
         result = loader.load(img_path)
         elapsed = time.time() - start
-        
+
         assert elapsed < 2.0  # Should load in less than 2 seconds
         assert result.width == 2000
         assert result.height == 2000
@@ -175,19 +175,19 @@ class TestCV2ImageLoaderPerformance:
     def test_load_multiple_images(self, temp_directory, loader):
         """Test loading multiple images in sequence."""
         import time
-        
+
         # Create 5 test images
         for i in range(5):
             img_path = temp_directory / f"test_{i}.png"
             img_data = np.random.randint(0, 256, (500, 500, 3), dtype=np.uint8)
             cv2.imwrite(str(img_path), img_data)
-        
+
         start = time.time()
         results = []
         for i in range(5):
             result = loader.load(temp_directory / f"test_{i}.png")
             results.append(result)
         elapsed = time.time() - start
-        
+
         assert len(results) == 5
         assert elapsed < 3.0  # Should load all in less than 3 seconds
