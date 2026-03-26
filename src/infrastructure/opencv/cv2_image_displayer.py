@@ -5,6 +5,7 @@ Path: src/infrastructure/opencv/cv2_image_displayer.py
 from typing import List, Optional, Tuple
 import cv2
 from src.infrastructure.numpy.image_adapter import NumPyImageAdapter
+from src.infrastructure.opencv.screen_info import get_screen_size
 from src.infrastructure.settings.logger import get_logger
 from src.use_cases.display_image import ImageDisplayPort
 from src.entities.image import Image
@@ -27,20 +28,8 @@ class CV2ImageDisplayer(ImageDisplayPort):
         return data
 
     def _get_screen_size(self) -> tuple[int, int]:
-        """Retorna (ancho, alto) de pantalla con fallback seguro."""
-        try:
-            import tkinter as tk
-
-            root = tk.Tk()
-            root.withdraw()
-            width = int(root.winfo_screenwidth())
-            height = int(root.winfo_screenheight())
-            root.destroy()
-            if width > 0 and height > 0:
-                return width, height
-        except Exception:
-            pass
-        return (1920, 1080)
+        """Retorna (ancho, alto) de pantalla desde utilidades de infraestructura."""
+        return get_screen_size()
 
     def _fit_image_to_screen(self, image, margin_ratio: float = 0.9):
         """Escala la imagen para que no exceda la pantalla."""
